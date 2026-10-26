@@ -1,0 +1,7 @@
+# Netlify: always revalidate the service worker and manifest so updates roll out.
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
