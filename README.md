@@ -148,15 +148,25 @@ You need two things: the **backend container plus a Postgres database**, and the
 ### Quick deploy: this repo on Neon + Render + GitHub Pages
 
 A concrete, free, start-to-finish walkthrough for `davyn1/flashcard-app`. You need your
-GitHub account plus two free sign-ups (**Neon** and **Render** — no credit card). The
+GitHub account plus two free sign-ups (**Neon** and **Render**). The
 frontend's public URL will be **https://davyn1.github.io/flashcard-app/**, so its origin
 (what the backend must allow for CORS) is `https://davyn1.github.io`.
 
-1. **Password hash (local, one command).** Generate `APP_PASSWORD_HASH` as described under
-   [Generating the password hash](#generating-the-password-hash). Keep the printed
-   `APP_PASSWORD_HASH='...'` line handy — you'll paste it into Render in step 3. Your
-   plain-text password never leaves your machine. (Ignore the `JWT_SECRET` line; Render
-   generates that one.)
+1. **Password hash (local).** The script needs the backend's Python packages, so on a machine
+   where you haven't set up the backend yet, install them first (Python 3.12+):
+
+   ```bash
+   cd backend
+   python -m venv .venv
+   source .venv/bin/activate          # Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   python scripts/hash_password.py
+   ```
+
+   Keep the printed `APP_PASSWORD_HASH='...'` line handy — you'll paste it into Render in
+   step 3. Your plain-text password never leaves your machine. (Ignore the `JWT_SECRET` line;
+   Render generates that one.) More detail under
+   [Generating the password hash](#generating-the-password-hash).
 2. **Database — Neon.** Sign up at <https://neon.tech> ("Continue with GitHub" is quickest),
    create a project (any name, nearest region), and copy its **connection string** — it
    looks like `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`. This becomes
@@ -169,8 +179,9 @@ frontend's public URL will be **https://davyn1.github.io/flashcard-app/**, so it
    - `CORS_ORIGINS` — `https://davyn1.github.io`
 
    `JWT_SECRET` is generated for you. Click **Apply**, then wait for the first deploy to
-   finish (a few minutes). Copy the service URL, e.g.
-   `https://korean-flashcards-api.onrender.com`.
+   finish (a few minutes). Copy the service URL shown at the top of the service's page. It
+   looks like `https://korean-flashcards-api.onrender.com`, but Render adds a random suffix
+   if that name is taken, so use the exact URL Render gives you.
 4. **Check the backend.** Open `<backend-url>/health` — it should return `{"ok":true}`.
    `<backend-url>/docs` shows the interactive API.
 5. **Frontend — GitHub Pages.**
@@ -253,7 +264,7 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
   day, turn on auto-play audio, or delete from the deck's ⚙ screen.
 - **Study direction:** Korean → English, English → Korean, or both. With *both*, each direction
   is scheduled as its own card.
-- **Creating cards:** open a deck and tap ➕ to add a card. The front is Korean, the back is
+- **Creating cards:** open a deck and tap **Add card**. The front is Korean, the back is
   English, and notes are for example sentences, grammar or romanization. In the editor, Enter
   moves from Korean to English, and Enter again saves and starts the next card, so you can add
   a run of cards without touching the mouse.
@@ -267,9 +278,8 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
 - **Reading Korean:** Korean text renders in Noto Sans KR, cached by the service worker so it
   looks right offline. Tap the 🔊 speaker on a card to hear it read aloud (Web Speech, `ko-KR`),
   or turn on auto-play audio per deck in the deck's ⚙ screen. The speaker is hidden on devices
-  with no Korean voice installed — on iPhone, add one under Settings → Accessibility → Spoken
-  Content → Voices → Korean. Put romanization in a card's notes if you want a reading aid while
-  you learn the script.
+  with no Korean voice installed (see **Korean audio on iPhone** above). Put romanization in a
+  card's notes if you want a reading aid while you learn the script.
 - **Studying:** tap the card or press **Space** to flip, then tap a rating or press **1–4**.
   **Esc** ends the session.
 - **Stats** (📊 on a deck): cards by state (new / learning / mature, where mature means an
