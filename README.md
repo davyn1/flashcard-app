@@ -145,6 +145,53 @@ cd frontend && npm test       # scheduler, session queue, sync/merge logic, impo
 You need two things: the **backend container plus a Postgres database**, and the
 **frontend as a static site on HTTPS**. Deploy the backend first so you have its URL.
 
+### Quick deploy: this repo on Neon + Render + GitHub Pages
+
+A concrete, free, start-to-finish walkthrough for `davyn1/flashcard-app`. You need your
+GitHub account plus two free sign-ups (**Neon** and **Render** — no credit card). The
+frontend's public URL will be **https://davyn1.github.io/flashcard-app/**, so its origin
+(what the backend must allow for CORS) is `https://davyn1.github.io`.
+
+1. **Password hash (local, one command).** Generate `APP_PASSWORD_HASH` as described under
+   [Generating the password hash](#generating-the-password-hash). Keep the printed
+   `APP_PASSWORD_HASH='...'` line handy — you'll paste it into Render in step 3. Your
+   plain-text password never leaves your machine. (Ignore the `JWT_SECRET` line; Render
+   generates that one.)
+2. **Database — Neon.** Sign up at <https://neon.tech> ("Continue with GitHub" is quickest),
+   create a project (any name, nearest region), and copy its **connection string** — it
+   looks like `postgresql://user:pass@ep-xxx.neon.tech/neondb?sslmode=require`. This becomes
+   `DATABASE_URL`.
+3. **Backend — Render.** Sign up at <https://render.com>, then **New → Blueprint** and select
+   this repo. Render reads [`render.yaml`](render.yaml) and prompts for the three variables
+   marked `sync: false`:
+   - `DATABASE_URL` — the Neon string from step 2
+   - `APP_PASSWORD_HASH` — the hash from step 1, pasted **without** the surrounding quotes
+   - `CORS_ORIGINS` — `https://davyn1.github.io`
+
+   `JWT_SECRET` is generated for you. Click **Apply**, then wait for the first deploy to
+   finish (a few minutes). Copy the service URL, e.g.
+   `https://korean-flashcards-api.onrender.com`.
+4. **Check the backend.** Open `<backend-url>/health` — it should return `{"ok":true}`.
+   `<backend-url>/docs` shows the interactive API.
+5. **Frontend — GitHub Pages.**
+   - Repo **Settings → Pages → Source: GitHub Actions**.
+   - Repo **Settings → Secrets and variables → Actions → Variables → New repository
+     variable**: name `VITE_API_URL`, value your backend URL from step 3 (no trailing slash).
+   - Build and publish: **Actions → "Deploy frontend to GitHub Pages" → Run workflow**
+     (or push any change under `frontend/`). The workflow runs the tests, builds with the
+     correct `BASE_PATH`, and deploys. [The workflow](.github/workflows/deploy-frontend.yml)
+     reads `VITE_API_URL` at build time, so set the variable *before* running it.
+6. **Open it.** Go to <https://davyn1.github.io/flashcard-app/> and sign in with your
+   password. On first sign-in a sample "Korean basics" deck (16 words) is added so you can
+   study right away.
+
+> **Heads-up:** Render's free backend sleeps after ~15 min idle, so the first sync after a
+> break takes ~30–50s to wake. The app is offline-first, so studying is never blocked — only
+> that first reconnect is slow. If you outgrow it, the same frontend also works on **Vercel**
+> (import the repo, set **Root Directory** to `frontend`, add `VITE_API_URL`).
+
+The generic, host-agnostic options below cover the same three pieces in more detail.
+
 ### Database (Neon or Supabase, free tier)
 
 Create a project and copy its connection string, for example
@@ -206,11 +253,23 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
   day, turn on auto-play audio, or delete from the deck's ⚙ screen.
 - **Study direction:** Korean → English, English → Korean, or both. With *both*, each direction
   is scheduled as its own card.
-- **Cards:** the front is Korean, the back is English, and notes are for example sentences,
-  grammar or romanization. In the editor, Enter moves from Korean to English, and Enter again
-  saves and starts the next card.
-- **Bulk import:** paste one card per line, `front<TAB>back` (copying from a spreadsheet
-  gives tabs), `front - back`, comma, or a custom separator. A third column becomes the notes.
+- **Creating cards:** open a deck and tap ➕ to add a card. The front is Korean, the back is
+  English, and notes are for example sentences, grammar or romanization. In the editor, Enter
+  moves from Korean to English, and Enter again saves and starts the next card, so you can add
+  a run of cards without touching the mouse.
+- **Importing data — bulk paste:** on a deck, choose **Import** and paste one card per line as
+  `front<TAB>back` (copying from a spreadsheet gives tabs), `front - back`, comma, or a custom
+  separator. A third column becomes the notes. Great for pasting a vocabulary list straight
+  from a spreadsheet or textbook.
+- **Importing data — restore a backup:** Settings → **Import JSON** loads a file exported from
+  this app (see **Backups** below). It merges by last-write-wins and never deletes anything, so
+  it's safe to run against an existing library or to move your data to a new device.
+- **Reading Korean:** Korean text renders in Noto Sans KR, cached by the service worker so it
+  looks right offline. Tap the 🔊 speaker on a card to hear it read aloud (Web Speech, `ko-KR`),
+  or turn on auto-play audio per deck in the deck's ⚙ screen. The speaker is hidden on devices
+  with no Korean voice installed — on iPhone, add one under Settings → Accessibility → Spoken
+  Content → Voices → Korean. Put romanization in a card's notes if you want a reading aid while
+  you learn the script.
 - **Studying:** tap the card or press **Space** to flip, then tap a rating or press **1–4**.
   **Esc** ends the session.
 - **Stats** (📊 on a deck): cards by state (new / learning / mature, where mature means an
