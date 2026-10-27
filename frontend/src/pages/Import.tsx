@@ -66,7 +66,7 @@ export default function Import({ deckId }: { deckId: string }) {
 
         <Field
           label="Paste your cards"
-          hint="One card per line: Korean, separator, English. An optional third column becomes the notes. Copy from a spreadsheet to get tabs."
+          hint="One card per line: front, separator, back. An optional third column becomes the notes. Copy from a spreadsheet to get tabs."
         >
           <textarea
             className={`${inputClass} hangul min-h-56 font-mono text-sm`}

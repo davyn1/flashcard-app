@@ -262,12 +262,12 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
 
 - **Decks:** create from the home screen. Rename, change study direction, set new cards per
   day, turn on auto-play audio, or delete from the deck's ⚙ screen.
-- **Study direction:** Korean → English, English → Korean, or both. With *both*, each direction
+- **Study direction:** Front → Back, Back → Front, or both. With *both*, each direction
   is scheduled as its own card.
-- **Creating cards:** open a deck and tap **Add card**. The front is Korean, the back is
-  English, and notes are for example sentences, grammar or romanization. In the editor, Enter
-  moves from Korean to English, and Enter again saves and starts the next card, so you can add
-  a run of cards without touching the mouse.
+- **Creating cards:** open a deck and tap **Add card**. Put anything on the front and back
+  (typically Korean on one side and English on the other); notes are for example sentences,
+  grammar or romanization. In the editor, Enter moves from the front to the back, and Enter
+  again saves and starts the next card, so you can add a run of cards without touching the mouse.
 - **Importing data — bulk paste:** on a deck, choose **Import** and paste one card per line as
   `front<TAB>back` (copying from a spreadsheet gives tabs), `front - back`, comma, or a custom
   separator. A third column becomes the notes. Great for pasting a vocabulary list straight

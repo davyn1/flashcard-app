@@ -205,7 +205,7 @@ export default function Study({ deckId }: { deckId: string }) {
               </button>
             )}
             <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
-              {current!.dir === 'fwd' ? 'Korean → English' : 'English → Korean'}
+              {current!.dir === 'fwd' ? 'Front → Back' : 'Back → Front'}
             </div>
             <div lang={hasHangul(prompt) ? 'ko' : 'en'} className={`hangul mt-4 font-bold ${faceSize(prompt)}`}>
               {prompt}

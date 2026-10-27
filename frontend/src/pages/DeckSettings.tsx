@@ -60,8 +60,8 @@ export default function DeckSettings({ deckId }: { deckId: string }) {
             value={direction}
             onChange={(e) => setDirection(e.target.value as StudyDirection)}
           >
-            <option value="ko_en">Korean → English</option>
-            <option value="en_ko">English → Korean</option>
+            <option value="ko_en">Front → Back</option>
+            <option value="en_ko">Back → Front</option>
             <option value="both">Both directions</option>
           </select>
         </Field>
@@ -79,7 +79,7 @@ export default function DeckSettings({ deckId }: { deckId: string }) {
         <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4">
           <span>
             <span className="block font-medium">Auto-play audio on flip</span>
-            <span className="block text-xs text-slate-500">Speaks the Korean side when a card is flipped.</span>
+            <span className="block text-xs text-slate-500">Speaks the Korean text on the card when it is flipped.</span>
           </span>
           <input
             type="checkbox"

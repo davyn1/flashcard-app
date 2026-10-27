@@ -119,7 +119,7 @@ function StrugglingRow({ card, state, showDir }: { card: Card; state: CardStateR
           <div className="hangul truncate text-lg font-medium">{card.front}</div>
           <div className="truncate text-sm text-slate-600 dark:text-slate-400">
             {card.back}
-            {showDir && <span className="text-slate-400"> · {state.direction === 'fwd' ? 'KO→EN' : 'EN→KO'}</span>}
+            {showDir && <span className="text-slate-400"> · {state.direction === 'fwd' ? 'Front→Back' : 'Back→Front'}</span>}
           </div>
         </div>
         <div className="text-right text-xs text-slate-500 tabular-nums">

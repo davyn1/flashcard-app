@@ -71,7 +71,7 @@ export default function CardEdit({ deckId, cardId }: { deckId?: string; cardId?:
     void save(isNew)
   }
 
-  // Enter in the Korean field moves to English; Enter in English saves.
+  // Enter in the front field moves to the back; Enter in the back saves.
   // Ignored while the IME is composing a syllable.
   function onFrontKey(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' && !isComposing(e)) {
@@ -105,14 +105,13 @@ export default function CardEdit({ deckId, cardId }: { deckId?: string; cardId?:
       }
     >
       <form onSubmit={onSubmit} onKeyDownCapture={imeGuard} className="flex flex-col gap-4">
-        <Field label="Korean (front)" hint={duplicate ? '⚠ A card with this front already exists in this deck.' : undefined}>
+        <Field label="Front" hint={duplicate ? '⚠ A card with this front already exists in this deck.' : undefined}>
           <input
             ref={frontRef}
             className={`${inputClass} hangul text-xl`}
             value={front}
             onChange={(e) => setFront(e.target.value)}
             onKeyDown={onFrontKey}
-            lang="ko"
             autoFocus
             autoComplete="off"
             autoCorrect="off"
@@ -120,7 +119,7 @@ export default function CardEdit({ deckId, cardId }: { deckId?: string; cardId?:
             maxLength={2000}
           />
         </Field>
-        <Field label="English (back)">
+        <Field label="Back">
           <input
             ref={backRef}
             className={inputClass}

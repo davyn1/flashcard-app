@@ -52,7 +52,7 @@ export default function Home() {
         <input
           type="search"
           className={`${inputClass} pl-10`}
-          placeholder="Search Korean or English…"
+          placeholder="Search cards…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search all cards"
