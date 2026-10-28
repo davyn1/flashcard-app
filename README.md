@@ -280,8 +280,10 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
 - **Reading Korean:** Korean text renders in Noto Sans KR, cached by the service worker so it
   looks right offline. Tap the 🔊 speaker on a card to hear it read aloud (Web Speech, `ko-KR`),
   or turn on auto-play audio per deck in the deck's ⚙ screen. The speaker is hidden on devices
-  with no Korean voice installed (see **Korean audio on iPhone** above). Put romanization in a
-  card's notes if you want a reading aid while you learn the script.
+  with no Korean voice installed (see **Korean audio on iPhone** above). The app picks a female
+  Korean voice automatically when the device has one; to choose a specific voice, use
+  **Settings → Pronunciation voice** (saved per device). Put romanization in a card's notes if
+  you want a reading aid while you learn the script.
 - **Study modes:** on a deck, pick **Flashcards** or **Typing Mode**. Both study the same due
   and new cards and update the same schedule, so use whichever you like each time.
 - **Flashcards:** tap the card or press **Space** to flip, then tap a rating or press **1–4**.

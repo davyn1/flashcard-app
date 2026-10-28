@@ -1,12 +1,19 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
 import { SyncIndicator } from '../components/SyncIndicator'
-import { Button, Page } from '../components/ui'
+import { Button, Page, inputClass } from '../components/ui'
 import { API_URL, clearAuth } from '../lib/api'
 import { downloadJson, exportAll, importBackup } from '../lib/backup'
 import { db } from '../lib/db'
 import { navigate } from '../lib/router'
-import { useKoreanVoice } from '../lib/speech'
+import {
+  getVoicePreference,
+  setVoicePreference,
+  speakKorean,
+  useKoreanVoice,
+  useKoreanVoices,
+  voiceGender,
+} from '../lib/speech'
 import { syncNow, useSyncState } from '../lib/sync'
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -22,6 +29,8 @@ export default function Settings() {
   const sync = useSyncState()
   const pending = useLiveQuery(() => db.outbox.count(), []) ?? 0
   const voice = useKoreanVoice()
+  const voices = useKoreanVoices()
+  const [voicePref, setVoicePref] = useState(getVoicePreference)
   const fileRef = useRef<HTMLInputElement>(null)
   const [message, setMessage] = useState<string | null>(null)
 
@@ -94,12 +103,51 @@ export default function Settings() {
           {message && <p className="mt-3 text-sm">{message}</p>}
         </Section>
 
+        <Section title="Pronunciation voice">
+          {voices.length === 0 ? (
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              No Korean voice on this device, so the speaker button is hidden. On iPhone, add one under Settings →
+              Accessibility → Spoken Content → Voices → Korean.
+            </p>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
+                Automatic picks a female voice when this device has one. This choice is saved on this device only.
+              </p>
+              <div className="flex gap-2">
+                <select
+                  className={inputClass}
+                  aria-label="Korean voice"
+                  value={voicePref && voices.some((v) => v.voiceURI === voicePref) ? voicePref : ''}
+                  onChange={(e) => {
+                    const uri = e.target.value || null
+                    setVoicePreference(uri)
+                    setVoicePref(uri)
+                  }}
+                >
+                  <option value="">Automatic{voice && !voicePref ? ` (${voice.name})` : ''}</option>
+                  {voices.map((v) => {
+                    const g = voiceGender(v)
+                    return (
+                      <option key={v.voiceURI} value={v.voiceURI}>
+                        {v.name}
+                        {g === 'unknown' ? '' : ` · ${g}`}
+                      </option>
+                    )
+                  })}
+                </select>
+                <Button onClick={() => speakKorean('안녕하세요', voice)} disabled={!voice}>
+                  Test
+                </Button>
+              </div>
+            </>
+          )}
+        </Section>
+
         <Section title="About">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-slate-500">Server</dt>
             <dd className="truncate">{API_URL}</dd>
-            <dt className="text-slate-500">Korean voice</dt>
-            <dd>{voice ? voice.name : 'Not available on this device'}</dd>
           </dl>
         </Section>
 
