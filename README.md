@@ -5,12 +5,15 @@ A Quizlet-style flashcard app for studying Korean with spaced repetition. It's a
 and opens full-screen, and works fully offline. A small FastAPI backend syncs decks
 and progress between your devices. It's single-user: one password, no accounts.
 
+**Live:** <https://davyn1.github.io/flashcard-app/> (frontend on GitHub Pages, backend on
+Render with a Neon Postgres database; see [Deployment](#deployment)).
+
 ```
 frontend/   Vite + React + TypeScript + Tailwind PWA (Dexie/IndexedDB, offline-first)
 backend/    FastAPI + SQLAlchemy 2 + Alembic (Postgres in prod, SQLite for dev)
 docker-compose.yml   backend + Postgres for local development
-render.yaml          optional Render blueprint for the backend
-.github/workflows/   optional GitHub Pages deploy for the frontend
+render.yaml          Render blueprint for the backend
+.github/workflows/   GitHub Pages deploy for the frontend (runs when `frontend/` changes on main)
 ```
 
 ## How it works
@@ -117,7 +120,7 @@ redeploy. Existing logins stay valid until their tokens expire (90 days), so als
 
 ```bash
 cd backend && pytest          # login, tokens, rate limiting, CORS, sync push/pull, conflicts, validation, migrations
-cd frontend && npm test       # scheduler, session queue, sync/merge logic, import parsing, backups
+cd frontend && npm test       # scheduler, session shuffling, study directions (incl. Mixed), Typing Mode answer checking, voice choice, sync/merge, import parsing, backups
 ```
 
 ## Environment variables
@@ -140,7 +143,7 @@ cd frontend && npm test       # scheduler, session queue, sync/merge logic, impo
 | Variable | Default | Description |
 |---|---|---|
 | `VITE_API_URL` | `http://localhost:8000` | Backend URL, no trailing slash. Must be `https://` in production |
-| `BASE_PATH` | `/` | Set when serving from a sub-path, e.g. `/korean-flashcards/` on GitHub Pages |
+| `BASE_PATH` | `/` | Set when serving from a sub-path, e.g. `/flashcard-app/` on GitHub Pages (the workflow sets it from the repo name) |
 
 ## Deployment
 
@@ -292,8 +295,8 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
   and new cards and update the same schedule, so use whichever you like each time.
 - **Flashcards:** tap the card or press **Space** to flip, then tap a rating or press **1–4**.
   **Esc** ends the session.
-- **Typing Mode:** each card shows a box: type your guess and press **Enter** (or **Don't know**). The app
-  checks it, ignoring case, punctuation, spacing and a leading "to"/"a"/"the", and accepting
+- **Typing Mode:** each card shows a box: type your guess and press **Enter** (or tap
+  **Don't know**). The app checks it, ignoring case, punctuation, spacing and a leading "to"/"a"/"the", and accepting
   any meaning separated by `,` `;` or `/`. A small typo counts as "almost". It then highlights
   a suggested rating (Good, Hard or Again); press **Enter** to take it or pick another.
   If the checker got it wrong, tap **My answer is correct**: that answer counts as correct now
