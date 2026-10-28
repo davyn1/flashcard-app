@@ -263,8 +263,12 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
 
 - **Decks:** create from the home screen. Rename, change study direction, set new cards per
   day, turn on auto-play audio, or delete from the deck's ⚙ screen.
-- **Study direction:** Front → Back, Back → Front, or both. With *both*, each direction
-  is scheduled as its own card.
+- **Study direction:** Front → Back, Back → Front, Mixed, or Both directions.
+  - *Mixed* keeps one schedule per card and asks a random side each time the card comes up,
+    so every word, including ones you already know, gets asked both ways. It continues the
+    Front → Back progress you already have.
+  - *Both directions* makes each side its own card with its own schedule (the reverse starts
+    as a new card and counts toward the daily new-card limit).
 - **Creating cards:** open a deck and tap **Add card**. Put anything on the front and back
   (typically Korean on one side and English on the other); notes are for example sentences,
   grammar or romanization. In the editor, Enter moves from the front to the back, and Enter

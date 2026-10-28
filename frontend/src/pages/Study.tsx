@@ -14,7 +14,7 @@ import {
   type Rating,
 } from '../lib/scheduler'
 import { speakKorean, useKoreanVoice } from '../lib/speech'
-import { sessionQueue } from '../lib/study'
+import { sessionQueue, shownDirection } from '../lib/study'
 import { hasHangul, isComposing } from '../lib/text'
 import {
   answerSide,
@@ -37,6 +37,8 @@ interface Session {
 interface LogEntry {
   key: string
   rating: Rating
+  /** The side that was asked (differs from the key's direction only on Mixed decks). */
+  shown: CardDir
 }
 
 function parseKey(key: string): { cardId: string; dir: CardDir } {
@@ -104,9 +106,21 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   const current = currentKey ? parseKey(currentKey) : null
   const card = current ? s?.cards.get(current.cardId) : undefined
 
-  const prompt = card ? (current!.dir === 'fwd' ? card.front : card.back) : ''
-  const answer = card ? (current!.dir === 'fwd' ? card.back : card.front) : ''
-  const side = current ? answerSide(current.dir) : 'back'
+  // `current.dir` is the schedule being reviewed; `shown` is the side actually asked
+  // (they differ only on Mixed decks).
+  const shown =
+    current && s
+      ? shownDirection(
+          s.deck.direction,
+          current.dir,
+          current.cardId,
+          log.length,
+          log.map((l) => l.shown),
+        )
+      : 'fwd'
+  const prompt = card ? (shown === 'fwd' ? card.front : card.back) : ''
+  const answer = card ? (shown === 'fwd' ? card.back : card.front) : ''
+  const side = answerSide(shown)
   const extraAnswers = (card && (side === 'front' ? card.accepted_front : card.accepted_back)) ?? []
   const koreanText = card ? (hasHangul(card.front) ? card.front : hasHangul(card.back) ? card.back : null) : null
   const koreanVisible = !!koreanText && (flipped || hasHangul(prompt))
@@ -160,7 +174,7 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
         states: new Map(s.states).set(rec.id, rec),
         queue: advanceQueue(s.queue, currentKey!, rating, next),
       })
-      setLog((l) => [...l, { key: currentKey!, rating }])
+      setLog((l) => [...l, { key: currentKey!, rating, shown }])
       setFlipped(false)
       setTyped('')
       setResult(null)
@@ -263,7 +277,7 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
               </button>
             )}
             <div className="text-xs font-medium tracking-wide text-slate-400 uppercase">
-              {current!.dir === 'fwd' ? 'Front → Back' : 'Back → Front'}
+              {shown === 'fwd' ? 'Front → Back' : 'Back → Front'}
             </div>
             <div lang={hasHangul(prompt) ? 'ko' : 'en'} className={`hangul mt-4 font-bold ${faceSize(prompt)}`}>
               {prompt}

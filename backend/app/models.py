@@ -19,7 +19,7 @@ class Deck(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
-    # "ko_en" | "en_ko" | "both"
+    # "ko_en" | "en_ko" | "both" | "mixed"
     direction: Mapped[str] = mapped_column(String(8), default="ko_en")
     new_per_day: Mapped[int] = mapped_column(Integer, default=20)
     autoplay_audio: Mapped[bool] = mapped_column(Boolean, default=False)

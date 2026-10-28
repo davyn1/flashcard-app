@@ -4,8 +4,11 @@
 
 import type { CardStateKind, Rating, SchedulingState } from './scheduler'
 
-/** ko_en = show Korean (front), answer English; en_ko = the reverse; both = two separate cards. */
-export type StudyDirection = 'ko_en' | 'en_ko' | 'both'
+/**
+ * ko_en = front → back; en_ko = back → front; both = each direction is its own card with its own
+ * schedule; mixed = one schedule per card, and each time it comes up a random side is asked.
+ */
+export type StudyDirection = 'ko_en' | 'en_ko' | 'both' | 'mixed'
 /** flip = reveal the answer; type = type a guess first, then reveal. */
 export type AnswerMode = 'flip' | 'type'
 /** fwd = front→back (Korean→English), rev = back→front. */
@@ -82,6 +85,7 @@ export interface ReviewRecord {
 
 export type SyncTable = 'decks' | 'cards' | 'card_states' | 'reviews'
 
+/** Scheduling directions for a deck. Mixed uses the front → back schedule for both sides. */
 export function dirsFor(direction: StudyDirection): CardDir[] {
   return direction === 'both' ? ['fwd', 'rev'] : direction === 'en_ko' ? ['rev'] : ['fwd']
 }

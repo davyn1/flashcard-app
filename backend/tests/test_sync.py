@@ -147,6 +147,11 @@ def test_card_accepted_answers_roundtrip_and_default_to_empty(client, auth):
     assert c["accepted_back"] == [] and c["accepted_front"] == []
 
 
+def test_deck_accepts_mixed_direction(client, auth):
+    push(client, auth, decks=[deck(direction="mixed")])
+    assert pull(client, auth)["decks"][0]["direction"] == "mixed"
+
+
 def test_last_write_wins_newer_update_applies(client, auth):
     push(client, auth, cards=[card(updated_at=1000, back="water")])
     res = push(client, auth, cards=[card(updated_at=2000, back="water (drink)")])

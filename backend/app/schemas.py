@@ -32,7 +32,7 @@ class _Record(BaseModel):
 class DeckRecord(_Record):
     id: Uuid
     name: Annotated[str, StringConstraints(min_length=1, max_length=200), AfterValidator(_nfc)]
-    direction: Literal["ko_en", "en_ko", "both"]
+    direction: Literal["ko_en", "en_ko", "both", "mixed"]
     new_per_day: int = Field(ge=0, le=9999)
     autoplay_audio: bool
     # Optional so clients from before this field existed can still push.

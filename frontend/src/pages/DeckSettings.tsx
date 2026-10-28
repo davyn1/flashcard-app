@@ -53,7 +53,7 @@ export default function DeckSettings({ deckId }: { deckId: string }) {
         </Field>
         <Field
           label="Study direction"
-          hint="With “Both”, each direction is scheduled separately as its own card."
+          hint="Mixed asks a random side each time and keeps one schedule per card. Both directions makes each side its own card with its own schedule."
         >
           <select
             className={inputClass}
@@ -62,7 +62,8 @@ export default function DeckSettings({ deckId }: { deckId: string }) {
           >
             <option value="ko_en">Front → Back</option>
             <option value="en_ko">Back → Front</option>
-            <option value="both">Both directions</option>
+            <option value="mixed">Mixed (random side each time)</option>
+            <option value="both">Both directions (separate cards)</option>
           </select>
         </Field>
         <Field label="New cards per day">
