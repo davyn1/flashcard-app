@@ -31,6 +31,8 @@ def card(updated_at=1000, **kw):
         "front": "물",
         "back": "water",
         "notes": "",
+        "accepted_front": [],
+        "accepted_back": [],
         "created_at": 1000,
         "updated_at": updated_at,
         "deleted_at": None,
@@ -134,6 +136,17 @@ def test_deck_answer_mode_roundtrips_and_defaults_to_flip(client, auth):
     assert pull(client, auth)["decks"][0]["answer_mode"] == "flip"
 
 
+def test_card_accepted_answers_roundtrip_and_default_to_empty(client, auth):
+    push(client, auth, cards=[card(accepted_back=["hi", "greetings"], accepted_front=["물"])])
+    c = pull(client, auth)["cards"][0]
+    assert c["accepted_back"] == ["hi", "greetings"]
+    assert c["accepted_front"] == ["물"]
+    older_client = {k: v for k, v in card(updated_at=2000).items() if not k.startswith("accepted_")}
+    push(client, auth, cards=[older_client])
+    c = pull(client, auth)["cards"][0]
+    assert c["accepted_back"] == [] and c["accepted_front"] == []
+
+
 def test_last_write_wins_newer_update_applies(client, auth):
     push(client, auth, cards=[card(updated_at=1000, back="water")])
     res = push(client, auth, cards=[card(updated_at=2000, back="water (drink)")])
@@ -220,6 +233,9 @@ def test_server_normalizes_text_to_nfc(client, auth):
         {"cards": [card(id="not-a-uuid")]},
         {"cards": [card(front="x" * 2001)]},
         {"cards": [card(updated_at=-1)]},
+        {"cards": [card(accepted_back=[""])]},
+        {"cards": [card(accepted_back=["x"] * 51)]},
+        {"cards": [card(accepted_back="hi")]},
         {"decks": [deck(direction="sideways")]},
         {"decks": [deck(name="")]},
         {"decks": [deck(answer_mode="quiz")]},

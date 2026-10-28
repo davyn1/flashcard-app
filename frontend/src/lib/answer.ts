@@ -67,10 +67,11 @@ function typoAllowance(answer: string): number {
   return n >= 8 ? 2 : n >= 4 ? 1 : 0
 }
 
-export function checkAnswer(typed: string, expected: string): AnswerResult {
+/** `extra` = answers you marked as correct before; they get the same leniency. */
+export function checkAnswer(typed: string, expected: string, extra: string[] = []): AnswerResult {
   const t = compact(typed)
   if (!t) return 'wrong'
-  const accepted = acceptedAnswers(expected)
+  const accepted = [expected, ...extra].flatMap(acceptedAnswers)
   if (accepted.includes(t)) return 'correct'
   if (accepted.some((a) => editDistance(t, a) <= typoAllowance(a))) return 'close'
   return 'wrong'

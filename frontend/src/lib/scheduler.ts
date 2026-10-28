@@ -3,8 +3,8 @@
  * so it runs offline on the client and is easy to unit test.
  *
  * Lifecycle of one card direction:
- *   new ──► learning (short minute-based steps, repeated within the session)
- *       ──► review   (day-based intervals that grow with the ease factor)
+ *   new ──► learning (Again/Hard: shown again within the session)
+ *       ──► review   (Good: 2 days, Easy: 4 days, then intervals grow with the ease factor)
  *   review ──Again──► relearning (minute steps) ──► review (with a reset interval)
  */
 
@@ -37,7 +37,7 @@ export interface SchedulerConfig {
   learningSteps: number[]
   /** Relearning steps after a lapse, in minutes. */
   relearningSteps: number[]
-  /** Interval (days) when a card finishes its learning steps. */
+  /** Interval (days) when Good is pressed on a new, learning or relearning card. */
   graduatingInterval: number
   /** Interval (days) when a new card is rated Easy. */
   easyInterval: number
@@ -47,7 +47,7 @@ export interface SchedulerConfig {
   hardMultiplier: number
   /** Delay (minutes) when a learning/relearning card is rated Hard. Review cards use hardMultiplier. */
   hardLearningDelay: number
-  /** New interval after a lapse = max(1, old * lapseMultiplier). 0 = classic SM-2 reset to 1 day. */
+  /** New interval after a lapse = max(graduatingInterval, old * lapseMultiplier). 0 = reset. */
   lapseMultiplier: number
   maxInterval: number
   /** How many cards later a card is shown again within the session, per rating. */
@@ -55,9 +55,9 @@ export interface SchedulerConfig {
 }
 
 export const DEFAULT_CONFIG: SchedulerConfig = {
-  learningSteps: [1, 10],
+  learningSteps: [1],
   relearningSteps: [10],
-  graduatingInterval: 1,
+  graduatingInterval: 2,
   easyInterval: 4,
   startingEase: 2.5,
   minEase: 1.3,
@@ -162,7 +162,7 @@ export function review(
 
     case 'review': {
       if (rating === 1) {
-        const interval = Math.max(1, Math.round(prev.interval * config.lapseMultiplier))
+        const interval = Math.max(config.graduatingInterval, Math.round(prev.interval * config.lapseMultiplier))
         return {
           ...s,
           state: 'relearning',

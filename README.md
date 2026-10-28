@@ -18,14 +18,13 @@ render.yaml          optional Render blueprint for the backend
 - **Spaced repetition** ([`frontend/src/lib/scheduler.ts`](frontend/src/lib/scheduler.ts)) is a
   simplified SM-2, written as pure functions with unit tests. After each card you rate it
   **Again / Hard / Good / Easy**:
-  - New cards go through short learning steps (1 min, 10 min) and are shown again later in the
-    same session before they graduate to a 1-day interval. *Hard* keeps the card on its current
-    step and makes it due again in 1 hour (it still repeats later in the session). *Easy* skips
-    straight to 4 days.
+  - New cards: *Again* brings the card back in 1 minute and *Hard* in 1 hour (both also repeat
+    it later in the same session). *Good* graduates it to 2 days and *Easy* to 4 days.
   - Review cards grow their interval: *Hard* ×1.2, *Good* ×ease, *Easy* ×ease×1.3. The ease
     factor starts at 2.5, drops by 0.15 on *Hard*, rises by 0.15 on *Easy*, and never goes below 1.3.
   - *Again* on a learned card counts a lapse, lowers ease by 0.2, and sends the card to
-    relearning. It comes back 3 cards later in the session and stays until you get it right.
+    relearning. It comes back 3 cards later in the session and stays until you get it right;
+    *Good* then sends it back out for 2 days.
     (Again during *initial* learning just restarts the steps and doesn't count as a lapse,
     so brand-new words don't get flagged as "struggling" on their first day.)
   - Each session shows due cards first (most overdue, then lowest ease), then up to the
@@ -292,6 +291,9 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
   checks it, ignoring case, punctuation, spacing and a leading "to"/"a"/"the", and accepting
   any meaning separated by `,` `;` or `/`. A small typo counts as "almost". It then highlights
   a suggested rating (Good, Hard or Again); press **Enter** to take it or pick another.
+  If the checker got it wrong, tap **My answer is correct**: that answer counts as correct now
+  and is accepted for that card from then on (with the same leniency for typos). Saved answers
+  are listed under **Also accepted in Typing Mode** when you edit the card, where you can remove them.
 - **Stats** (📊 on a deck): cards by state (new / learning / mature, where mature means an
   interval of 21+ days), reviews per day for the last 30 days, and struggling cards
   (3+ lapses or ease ≤ 2.0).

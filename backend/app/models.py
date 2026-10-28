@@ -8,7 +8,7 @@ them identical between the browser (Date.now()) and the server.
 GET /sync/pull?since=... filters on, so client clock skew can't hide changes.
 """
 
-from sqlalchemy import BigInteger, Boolean, Float, Integer, SmallInteger, String, Text
+from sqlalchemy import JSON, BigInteger, Boolean, Float, Integer, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -40,6 +40,9 @@ class Card(Base):
     front: Mapped[str] = mapped_column(Text)
     back: Mapped[str] = mapped_column(Text)
     notes: Mapped[str] = mapped_column(Text, default="")
+    # Extra answers accepted in Typing Mode, per side (lists of strings).
+    accepted_front: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    accepted_back: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
     created_at: Mapped[int] = mapped_column(BigInteger)
     updated_at: Mapped[int] = mapped_column(BigInteger)
     deleted_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

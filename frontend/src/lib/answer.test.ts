@@ -41,6 +41,14 @@ describe('checkAnswer', () => {
     expect(checkAnswer('물', '불')).toBe('wrong')
   })
 
+  it('accepts answers you marked as correct, with the same leniency', () => {
+    expect(checkAnswer('hi', 'Hello')).toBe('wrong')
+    expect(checkAnswer('hi', 'Hello', ['hi'])).toBe('correct')
+    expect(checkAnswer('Hi!', 'Hello', ['hi'])).toBe('correct')
+    expect(checkAnswer('greetings', 'Hello', ['greetings'])).toBe('correct')
+    expect(checkAnswer('greetinsg', 'Hello', ['greetings'])).toBe('close')
+  })
+
   it('marks blank and unrelated answers wrong', () => {
     expect(checkAnswer('', 'Water')).toBe('wrong')
     expect(checkAnswer('   ', 'Water')).toBe('wrong')

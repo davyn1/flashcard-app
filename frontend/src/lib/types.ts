@@ -10,6 +10,13 @@ export type StudyDirection = 'ko_en' | 'en_ko' | 'both'
 export type AnswerMode = 'flip' | 'type'
 /** fwd = front→back (Korean→English), rev = back→front. */
 export type CardDir = 'fwd' | 'rev'
+/** Which side of a card is being answered. */
+export type CardSide = 'front' | 'back'
+
+/** The side you type when studying in this direction. */
+export function answerSide(dir: CardDir): CardSide {
+  return dir === 'fwd' ? 'back' : 'front'
+}
 
 export interface Deck {
   id: string
@@ -32,6 +39,10 @@ export interface Card {
   /** English */
   back: string
   notes: string
+  /** Extra answers accepted in Typing Mode when the front is the answer (Back → Front). */
+  accepted_front?: string[]
+  /** Extra answers accepted in Typing Mode when the back is the answer (Front → Back). */
+  accepted_back?: string[]
   created_at: number
   updated_at: number
   deleted_at: number | null

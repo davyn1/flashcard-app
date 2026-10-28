@@ -2,9 +2,10 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Button, Field, Icon, Page, imeGuard, inputClass } from '../components/ui'
 import { db } from '../lib/db'
-import { addCard, deleteCard, updateCard } from '../lib/repo'
+import { addCard, deleteCard, removeAcceptedAnswer, updateCard } from '../lib/repo'
 import { navigate } from '../lib/router'
 import { isComposing, nfc } from '../lib/text'
+import type { CardSide } from '../lib/types'
 import { NotFound } from './DeckView'
 
 /** Add (deckId given) or edit (cardId given) a card. */
@@ -140,6 +141,8 @@ export default function CardEdit({ deckId, cardId }: { deckId?: string; cardId?:
           />
         </Field>
 
+        {card && <AcceptedAnswers cardId={card.id} back={card.accepted_back ?? []} front={card.accepted_front ?? []} />}
+
         <div className="flex flex-col gap-2 sm:flex-row-reverse">
           <Button type="submit" variant="primary" disabled={!canSave} className="sm:flex-1">
             {isNew ? 'Save & add another' : 'Save'}
@@ -157,5 +160,41 @@ export default function CardEdit({ deckId, cardId }: { deckId?: string; cardId?:
         )}
       </form>
     </Page>
+  )
+}
+
+/** Answers you marked as correct in Typing Mode, with a way to remove them. */
+function AcceptedAnswers({ cardId, back, front }: { cardId: string; back: string[]; front: string[] }) {
+  if (!back.length && !front.length) return null
+  const group = (label: string, side: CardSide, items: string[]) =>
+    items.length > 0 && (
+      <div>
+        <div className="mb-1 text-xs text-slate-500">{label}</div>
+        <ul className="flex flex-wrap gap-2">
+          {items.map((a) => (
+            <li
+              key={a}
+              className="hangul flex items-center gap-1 rounded-full bg-slate-100 py-1 pr-1 pl-3 text-sm dark:bg-slate-800"
+            >
+              {a}
+              <button
+                type="button"
+                className="flex h-7 w-7 items-center justify-center rounded-full text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+                aria-label={`Stop accepting “${a}”`}
+                onClick={() => void removeAcceptedAnswer(cardId, side, a)}
+              >
+                <Icon name="x" className="h-4 w-4" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="text-sm font-medium text-slate-600 dark:text-slate-300">Also accepted in Typing Mode</div>
+      {group('For the back (Front → Back)', 'back', back)}
+      {group('For the front (Back → Front)', 'front', front)}
+    </section>
   )
 }

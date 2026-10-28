@@ -13,7 +13,16 @@ vi.mock('./api', async (orig) => ({
 
 import { exportAll, importBackup } from './backup'
 import { db, getMeta } from './db'
-import { addCard, createDeck, deleteCard, nextTimestamp, recordReview, updateCard } from './repo'
+import {
+  addAcceptedAnswer,
+  addCard,
+  createDeck,
+  deleteCard,
+  nextTimestamp,
+  recordReview,
+  removeAcceptedAnswer,
+  updateCard,
+} from './repo'
 import { seedIfEmpty } from './seed'
 import { PULL_CURSOR_KEY, incomingWins, mergeRecords, pullChanges, pushChanges, type SyncPayload } from './sync'
 import type { Card } from './types'
@@ -57,18 +66,40 @@ describe('local writes', () => {
     expect((await db.cards.get(card.id))!.updated_at).toBeGreaterThan(Date.now() + 59_000)
   })
 
+  it('stores accepted answers per side, NFC-normalized, without duplicates, and queues the card', async () => {
+    const deck = await createDeck('D')
+    const card = await addCard(deck.id, { front: '안녕', back: 'hello' })
+    await db.outbox.clear()
+    const before = (await db.cards.get(card.id))!.updated_at
+    await addAcceptedAnswer(card.id, 'back', ' hi ')
+    await addAcceptedAnswer(card.id, 'back', 'hi')
+    await addAcceptedAnswer(card.id, 'front', '안녕'.normalize('NFD') + '하세요')
+    await addAcceptedAnswer(card.id, 'back', '   ')
+    let stored = (await db.cards.get(card.id))!
+    expect(stored.accepted_back).toEqual(['hi'])
+    expect(stored.accepted_front).toEqual(['안녕하세요'])
+    expect(stored.updated_at).toBeGreaterThan(before)
+    expect(await db.outbox.get(`cards:${card.id}`)).toBeDefined()
+
+    await updateCard(card.id, { front: '안녕', back: 'hello!' })
+    expect((await db.cards.get(card.id))!.accepted_back).toEqual(['hi'])
+    await removeAcceptedAnswer(card.id, 'back', 'hi')
+    stored = (await db.cards.get(card.id))!
+    expect(stored.accepted_back).toEqual([])
+  })
+
   it('recordReview stores the new state and appends to the review log', async () => {
     const deck = await createDeck('D')
     const card = await addCard(deck.id, { front: '학교', back: 'school' })
     const s1 = await recordReview(card, 'fwd', 1, 1_000_000)
     const s2 = await recordReview(card, 'fwd', 3, 1_060_000)
     expect(s1.id).toBe(`${card.id}:fwd`)
-    expect(s2.state).toBe('learning')
+    expect(s2.state).toBe('review')
     expect(s2.introduced_at).toBe(1_000_000)
     const log = await db.reviews.where('card_id').equals(card.id).sortBy('reviewed_at')
     expect(log.map((r) => [r.rating, r.prev_state, r.state])).toEqual([
       [1, 'new', 'learning'],
-      [3, 'learning', 'learning'],
+      [3, 'learning', 'review'],
     ])
     expect(await db.outbox.where('table').equals('reviews').count()).toBe(2)
   })

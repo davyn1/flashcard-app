@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Icon, imeGuard, inputClass } from '../components/ui'
 import { checkAnswer, suggestedRating, type AnswerResult } from '../lib/answer'
 import { db } from '../lib/db'
-import { deckCards, recordReview, statesForCards } from '../lib/repo'
+import { addAcceptedAnswer, deckCards, recordReview, statesForCards } from '../lib/repo'
 import { navigate } from '../lib/router'
 import {
   RATING_LABELS,
@@ -17,6 +17,7 @@ import { speakKorean, useKoreanVoice } from '../lib/speech'
 import { sessionQueue } from '../lib/study'
 import { hasHangul, isComposing } from '../lib/text'
 import {
+  answerSide,
   fromScheduling,
   toScheduling,
   type AnswerMode,
@@ -74,6 +75,8 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   // Typing mode: what was typed and how it compared to the answer (null until checked).
   const [typed, setTyped] = useState('')
   const [result, setResult] = useState<AnswerResult | null>(null)
+  /** You overrode the checker and saved your answer as correct for this card. */
+  const [savedAnswer, setSavedAnswer] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const voice = useKoreanVoice()
 
@@ -103,6 +106,8 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
 
   const prompt = card ? (current!.dir === 'fwd' ? card.front : card.back) : ''
   const answer = card ? (current!.dir === 'fwd' ? card.back : card.front) : ''
+  const side = current ? answerSide(current.dir) : 'back'
+  const extraAnswers = (card && (side === 'front' ? card.accepted_front : card.accepted_back)) ?? []
   const koreanText = card ? (hasHangul(card.front) ? card.front : hasHangul(card.back) ? card.back : null) : null
   const koreanVisible = !!koreanText && (flipped || hasHangul(prompt))
   const typeMode = mode === 'type'
@@ -115,9 +120,25 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
 
   const check = useCallback(() => {
     if (!card || flipped || !typed.trim()) return
-    setResult(checkAnswer(typed, answer))
+    setResult(checkAnswer(typed, answer, extraAnswers))
     flip()
-  }, [card, flipped, typed, answer, flip])
+  }, [card, flipped, typed, answer, extraAnswers, flip])
+
+  // "My answer was right": count it as correct now and accept it for this card from now on.
+  const acceptTyped = useCallback(() => {
+    if (!s || !card || !flipped || !typed.trim() || result === 'correct') return
+    setResult('correct')
+    setSavedAnswer(true)
+    addAcceptedAnswer(card.id, side, typed)
+      .then((updated) => {
+        if (!updated) return
+        // Keep the session's copy current so a re-queued card uses the new answer too.
+        setSession((cur) =>
+          cur && cur !== 'missing' ? { ...cur, cards: new Map(cur.cards).set(updated.id, updated) } : cur,
+        )
+      })
+      .catch((e) => console.error('Failed to save accepted answer', e))
+  }, [s, card, flipped, typed, result, side])
 
   const giveUp = useCallback(() => {
     if (!card || flipped) return
@@ -143,6 +164,7 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
       setFlipped(false)
       setTyped('')
       setResult(null)
+      setSavedAnswer(false)
       recordReview(card, current.dir, rating, now).catch((e) => console.error('Failed to save review', e))
     },
     [s, card, current, currentKey, flipped],
@@ -248,7 +270,9 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
             </div>
             {flipped ? (
               <div className="mt-6 w-full border-t border-slate-200 pt-6 dark:border-slate-700">
-                {typeMode && result && <Feedback result={result} typed={typed} />}
+                {typeMode && result && (
+                  <Feedback result={result} typed={typed} saved={savedAnswer} onAccept={acceptTyped} />
+                )}
                 <div
                   lang={hasHangul(answer) ? 'ko' : 'en'}
                   className={`hangul font-semibold text-indigo-700 dark:text-indigo-300 ${answerSize(answer)}`}
@@ -345,9 +369,28 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   )
 }
 
-function Feedback({ result, typed }: { result: AnswerResult; typed: string }) {
+function Feedback({
+  result,
+  typed,
+  saved,
+  onAccept,
+}: {
+  result: AnswerResult
+  typed: string
+  saved: boolean
+  onAccept: () => void
+}) {
   if (result === 'correct') {
-    return <p className="mb-4 text-lg font-semibold text-emerald-600 dark:text-emerald-400">✓ Correct</p>
+    return (
+      <div className="mb-4">
+        <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">✓ Correct</p>
+        {saved && (
+          <p className="hangul mt-1 text-sm text-slate-600 dark:text-slate-400">
+            “{typed.trim()}” will count as correct for this card from now on.
+          </p>
+        )}
+      </div>
+    )
   }
   const tone = result === 'close' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
   return (
@@ -359,6 +402,15 @@ function Feedback({ result, typed }: { result: AnswerResult; typed: string }) {
         </p>
       ) : (
         <p className="mt-1 text-slate-500">No answer given</p>
+      )}
+      {typed.trim() && (
+        <button
+          type="button"
+          onClick={onAccept}
+          className="mt-3 inline-flex min-h-11 items-center rounded-xl px-4 text-sm font-medium text-indigo-700 ring-1 ring-indigo-300 hover:bg-indigo-50 dark:text-indigo-300 dark:ring-indigo-800 dark:hover:bg-indigo-950"
+        >
+          My answer is correct
+        </button>
       )}
       <p className="mt-3 text-xs font-medium tracking-wide text-slate-400 uppercase">Answer</p>
     </div>

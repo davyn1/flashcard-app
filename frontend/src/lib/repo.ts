@@ -11,6 +11,7 @@ import {
   toScheduling,
   type Card,
   type CardDir,
+  type CardSide,
   type CardStateRecord,
   type Deck,
   type ReviewRecord,
@@ -111,6 +112,8 @@ export async function addCards(deckId: string, inputs: CardInput[]): Promise<Car
     front: nfc(c.front),
     back: nfc(c.back),
     notes: nfc(c.notes ?? ''),
+    accepted_front: [],
+    accepted_back: [],
     // Keep the pasted order when ordering new cards.
     created_at: now + i,
     updated_at: now,
@@ -139,6 +142,41 @@ export async function updateCard(id: string, input: CardInput): Promise<void> {
       notes: nfc(input.notes ?? ''),
       updated_at: nextTimestamp(card),
     })
+    await markDirty('cards', id)
+  })
+  notifyChange()
+}
+
+/**
+ * Remember `text` as a correct answer for one side of a card (Typing Mode). Returns the
+ * updated card, or the unchanged card if it was blank or already listed.
+ */
+export async function addAcceptedAnswer(id: string, side: CardSide, text: string): Promise<Card | undefined> {
+  const value = nfc(text)
+  const key = side === 'front' ? 'accepted_front' : 'accepted_back'
+  let result: Card | undefined
+  await db.transaction('rw', db.cards, db.outbox, async () => {
+    const card = await db.cards.get(id)
+    result = card
+    if (!card || !value) return
+    const list = card[key] ?? []
+    if (list.includes(value) || list.length >= 50) return
+    result = { ...card, [key]: [...list, value], updated_at: nextTimestamp(card) }
+    await db.cards.put(result)
+    await markDirty('cards', id)
+  })
+  notifyChange()
+  return result
+}
+
+export async function removeAcceptedAnswer(id: string, side: CardSide, text: string): Promise<void> {
+  const key = side === 'front' ? 'accepted_front' : 'accepted_back'
+  await db.transaction('rw', db.cards, db.outbox, async () => {
+    const card = await db.cards.get(id)
+    if (!card) return
+    const list = card[key] ?? []
+    if (!list.includes(text)) return
+    await db.cards.put({ ...card, [key]: list.filter((a) => a !== text), updated_at: nextTimestamp(card) })
     await markDirty('cards', id)
   })
   notifyChange()

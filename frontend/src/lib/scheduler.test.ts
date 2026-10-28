@@ -46,16 +46,18 @@ describe('new cards / learning steps', () => {
     expect(s.lastReviewed).toBe(NOW)
   })
 
-  it('Good walks through the learning steps then graduates to 1 day', () => {
-    let s = review(newState(NOW), 3, NOW)
-    expect(s).toMatchObject({ state: 'learning', step: 1 })
-    expect(s.due).toBe(NOW + 10 * MIN)
-
-    s = review(s, 3, NOW + 10 * MIN)
+  it('Good graduates a new card straight to 2 days', () => {
+    const s = review(newState(NOW), 3, NOW)
     expect(s.state).toBe('review')
-    expect(s.interval).toBe(1)
+    expect(s.interval).toBe(2)
     expect(s.reps).toBe(1)
-    expect(s.due).toBe(NOW + 10 * MIN + DAY)
+    expect(s.due).toBe(NOW + 2 * DAY)
+  })
+
+  it('Good after Again also graduates to 2 days', () => {
+    const s = review(review(newState(NOW), 1, NOW), 3, NOW + MIN)
+    expect(s).toMatchObject({ state: 'review', interval: 2 })
+    expect(s.due).toBe(NOW + MIN + 2 * DAY)
   })
 
   it('Easy graduates a new card immediately with the easy interval', () => {
@@ -68,20 +70,20 @@ describe('new cards / learning steps', () => {
     const s = review(newState(NOW), 2, NOW)
     expect(s).toMatchObject({ state: 'learning', step: 0 })
     expect(s.due).toBe(NOW + 60 * MIN)
-    const later = review(review(newState(NOW), 3, NOW), 2, NOW)
-    expect(later).toMatchObject({ state: 'learning', step: 1 })
-    expect(later.due).toBe(NOW + 60 * MIN)
+    const afterAgain = review(review(newState(NOW), 1, NOW), 2, NOW)
+    expect(afterAgain).toMatchObject({ state: 'learning', step: 0 })
+    expect(afterAgain.due).toBe(NOW + 60 * MIN)
   })
 
   it('Hard while relearning is also due in 1 hour, without changing the reset interval', () => {
     const lapsed = review(reviewCard({ interval: 30 }), 1, NOW)
     const s = review(lapsed, 2, NOW)
-    expect(s).toMatchObject({ state: 'relearning', interval: 1 })
+    expect(s).toMatchObject({ state: 'relearning', interval: 2 })
     expect(s.due).toBe(NOW + 60 * MIN)
   })
 
   it('Again during learning goes back to the first step without counting a lapse', () => {
-    let s = review(newState(NOW), 3, NOW)
+    let s = review(newState(NOW), 2, NOW)
     s = review(s, 1, NOW + MIN)
     expect(s.step).toBe(0)
     expect(s.lapses).toBe(0)
@@ -89,7 +91,7 @@ describe('new cards / learning steps', () => {
   })
 
   it('keeps the original introducedAt across reviews', () => {
-    let s = review(newState(NOW), 3, NOW)
+    let s = review(newState(NOW), 1, NOW)
     s = review(s, 3, NOW + 5 * MIN)
     expect(s.introducedAt).toBe(NOW)
   })
@@ -120,7 +122,7 @@ describe('review cards', () => {
     expect(s.lapses).toBe(2)
     expect(s.ease).toBe(2.3)
     expect(s.reps).toBe(0)
-    expect(s.interval).toBe(1)
+    expect(s.interval).toBe(2)
     expect(s.due).toBe(NOW + 10 * MIN)
   })
 
@@ -131,12 +133,12 @@ describe('review cards', () => {
     expect(review(reviewCard({ ease: 1.3 }), 2, NOW).ease).toBe(1.3)
   })
 
-  it('relearning graduates back to review with the reset interval on Good', () => {
+  it('relearning graduates back to review in 2 days on Good', () => {
     const lapsed = review(reviewCard({ interval: 30 }), 1, NOW)
     const back = review(lapsed, 3, NOW + 10 * MIN)
     expect(back.state).toBe('review')
-    expect(back.interval).toBe(1)
-    expect(back.due).toBe(NOW + 10 * MIN + DAY)
+    expect(back.interval).toBe(2)
+    expect(back.due).toBe(NOW + 10 * MIN + 2 * DAY)
   })
 
   it('a well-known card keeps getting pushed further out', () => {
@@ -163,7 +165,7 @@ describe('previewDelays / formatDelay', () => {
     const p = previewDelays(newState(NOW), NOW)
     expect(formatDelay(p[1])).toBe('1m')
     expect(formatDelay(p[2])).toBe('1h')
-    expect(formatDelay(p[3])).toBe('10m')
+    expect(formatDelay(p[3])).toBe('2d')
     expect(formatDelay(p[4])).toBe('4d')
     expect(formatDelay(30 * 1000)).toBe('<1m')
     expect(formatDelay(3 * 3600_000)).toBe('3h')
@@ -231,16 +233,18 @@ describe('advanceQueue (in-session repetition)', () => {
     expect(q).toHaveLength(queue.length)
   })
 
-  it('re-queues learning cards further back for Good than for Again', () => {
+  it('re-queues learning cards further back for Hard than for Again, and drops them on Good', () => {
     const again = advanceQueue(queue, 'a', 1, review(newState(NOW), 1, NOW))
+    const hard = advanceQueue(queue, 'a', 2, review(newState(NOW), 2, NOW))
     const good = advanceQueue(queue, 'a', 3, review(newState(NOW), 3, NOW))
-    expect(good.indexOf('a')).toBeGreaterThan(again.indexOf('a'))
+    expect(hard.indexOf('a')).toBeGreaterThan(again.indexOf('a'))
+    expect(good).not.toContain('a')
   })
 
   it('appends to the end when the queue is short, so the session continues until learned', () => {
     let q = ['a']
     let s = newState(NOW)
-    const ratings: Rating[] = [1, 1, 3, 3]
+    const ratings: Rating[] = [1, 2, 1, 3]
     let shown = 0
     for (const r of ratings) {
       expect(q[0]).toBe('a')

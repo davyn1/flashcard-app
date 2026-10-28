@@ -16,6 +16,10 @@ Uuid = Annotated[str, StringConstraints(pattern=UUID_PATTERN)]
 Ms = Annotated[int, Field(ge=0, le=MAX_MS)]
 Text = Annotated[str, StringConstraints(max_length=2000), AfterValidator(_nfc)]
 Notes = Annotated[str, StringConstraints(max_length=5000), AfterValidator(_nfc)]
+AcceptedAnswers = Annotated[
+    list[Annotated[str, StringConstraints(min_length=1, max_length=500), AfterValidator(_nfc)]],
+    Field(max_length=50),
+]
 Direction = Literal["fwd", "rev"]
 StateKind = Literal["new", "learning", "review", "relearning"]
 
@@ -44,6 +48,9 @@ class CardRecord(_Record):
     front: Text
     back: Text
     notes: Notes = ""
+    # Optional so clients from before this field existed can still push.
+    accepted_front: AcceptedAnswers = Field(default_factory=list)
+    accepted_back: AcceptedAnswers = Field(default_factory=list)
     created_at: Ms
     updated_at: Ms
     deleted_at: Ms | None = None

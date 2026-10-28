@@ -35,6 +35,7 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const isStr = (v: unknown) => typeof v === 'string'
 const isNum = (v: unknown) => typeof v === 'number' && Number.isFinite(v)
 const isNumOrNull = (v: unknown) => v === null || isNum(v)
+const isOptStrList = (v: unknown) => v === undefined || (Array.isArray(v) && v.every(isStr))
 
 function validDeck(r: unknown) {
   return (
@@ -48,6 +49,7 @@ function validDeck(r: unknown) {
 function validCard(r: unknown) {
   return (
     isObj(r) && isStr(r.id) && isStr(r.deck_id) && isStr(r.front) && isStr(r.back) && isStr(r.notes) &&
+    isOptStrList(r.accepted_front) && isOptStrList(r.accepted_back) &&
     isNum(r.created_at) && isNum(r.updated_at) && isNumOrNull(r.deleted_at)
   )
 }
@@ -86,7 +88,14 @@ export async function importBackup(json: unknown): Promise<number> {
     {
       ...data,
       decks: data.decks.map((d) => ({ ...d, name: nfc(d.name) })),
-      cards: data.cards.map((c) => ({ ...c, front: nfc(c.front), back: nfc(c.back), notes: nfc(c.notes) })),
+      cards: data.cards.map((c) => ({
+        ...c,
+        front: nfc(c.front),
+        back: nfc(c.back),
+        notes: nfc(c.notes),
+        accepted_front: c.accepted_front?.map(nfc),
+        accepted_back: c.accepted_back?.map(nfc),
+      })),
     },
     { markDirty: true },
   )
