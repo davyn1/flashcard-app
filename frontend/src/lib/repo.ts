@@ -44,7 +44,7 @@ function markDirty(table: SyncTable, id: string) {
 // Decks
 // ---------------------------------------------------------------------------
 
-export const DECK_DEFAULTS = { direction: 'ko_en', new_per_day: 20, autoplay_audio: false } as const
+export const DECK_DEFAULTS = { direction: 'ko_en', new_per_day: 20, autoplay_audio: false, answer_mode: 'flip' } as const
 
 export async function createDeck(name: string, patch: Partial<Deck> = {}): Promise<Deck> {
   const now = Date.now()
@@ -67,7 +67,7 @@ export async function createDeck(name: string, patch: Partial<Deck> = {}): Promi
 
 export async function updateDeck(
   id: string,
-  patch: Partial<Pick<Deck, 'name' | 'direction' | 'new_per_day' | 'autoplay_audio'>>,
+  patch: Partial<Pick<Deck, 'name' | 'direction' | 'new_per_day' | 'autoplay_audio' | 'answer_mode'>>,
 ): Promise<void> {
   await db.transaction('rw', db.decks, db.outbox, async () => {
     const deck = await db.decks.get(id)

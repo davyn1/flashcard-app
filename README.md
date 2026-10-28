@@ -284,6 +284,11 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
   card's notes if you want a reading aid while you learn the script.
 - **Studying:** tap the card or press **Space** to flip, then tap a rating or press **1–4**.
   **Esc** ends the session.
+- **Typing answers:** in a deck's ⚙ screen, set **How to answer** to **Type the answer**. Each
+  card then shows a box: type your guess and press **Enter** (or **Don't know**). The app
+  checks it, ignoring case, punctuation, spacing and a leading "to"/"a"/"the", and accepting
+  any meaning separated by `,` `;` or `/`. A small typo counts as "almost". It then highlights
+  a suggested rating (Good, Hard or Again); press **Enter** to take it or pick another.
 - **Stats** (📊 on a deck): cards by state (new / learning / mature, where mature means an
   interval of 21+ days), reviews per day for the last 30 days, and struggling cards
   (3+ lapses or ease ≤ 2.0).

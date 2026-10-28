@@ -4,7 +4,7 @@ import { Button, Field, Page, imeGuard, inputClass } from '../components/ui'
 import { db } from '../lib/db'
 import { deleteDeck, updateDeck } from '../lib/repo'
 import { navigate } from '../lib/router'
-import type { StudyDirection } from '../lib/types'
+import type { AnswerMode, StudyDirection } from '../lib/types'
 import { NotFound } from './DeckView'
 
 export default function DeckSettings({ deckId }: { deckId: string }) {
@@ -13,6 +13,7 @@ export default function DeckSettings({ deckId }: { deckId: string }) {
   const [direction, setDirection] = useState<StudyDirection>('ko_en')
   const [newPerDay, setNewPerDay] = useState('20')
   const [autoplay, setAutoplay] = useState(false)
+  const [answerMode, setAnswerMode] = useState<AnswerMode>('flip')
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export default function DeckSettings({ deckId }: { deckId: string }) {
       setDirection(deck.direction)
       setNewPerDay(String(deck.new_per_day))
       setAutoplay(deck.autoplay_audio)
+      setAnswerMode(deck.answer_mode ?? 'flip')
       setLoaded(true)
     }
   }, [deck, loaded])
@@ -35,6 +37,7 @@ export default function DeckSettings({ deckId }: { deckId: string }) {
       direction,
       new_per_day: Number.parseInt(newPerDay, 10) || 0,
       autoplay_audio: autoplay,
+      answer_mode: answerMode,
     })
     navigate(`/deck/${deckId}`)
   }
@@ -63,6 +66,19 @@ export default function DeckSettings({ deckId }: { deckId: string }) {
             <option value="ko_en">Front → Back</option>
             <option value="en_ko">Back → Front</option>
             <option value="both">Both directions</option>
+          </select>
+        </Field>
+        <Field
+          label="How to answer"
+          hint="Typing checks your answer for you (ignoring case, punctuation and small typos), then suggests a rating."
+        >
+          <select
+            className={inputClass}
+            value={answerMode}
+            onChange={(e) => setAnswerMode(e.target.value as AnswerMode)}
+          >
+            <option value="flip">Flip the card</option>
+            <option value="type">Type the answer</option>
           </select>
         </Field>
         <Field label="New cards per day">

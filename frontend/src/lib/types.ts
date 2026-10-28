@@ -6,6 +6,8 @@ import type { CardStateKind, Rating, SchedulingState } from './scheduler'
 
 /** ko_en = show Korean (front), answer English; en_ko = the reverse; both = two separate cards. */
 export type StudyDirection = 'ko_en' | 'en_ko' | 'both'
+/** flip = reveal the answer; type = type a guess first, then reveal. */
+export type AnswerMode = 'flip' | 'type'
 /** fwd = front→back (Korean→English), rev = back→front. */
 export type CardDir = 'fwd' | 'rev'
 
@@ -15,6 +17,8 @@ export interface Deck {
   direction: StudyDirection
   new_per_day: number
   autoplay_audio: boolean
+  /** Missing on records saved before this setting existed; treat as 'flip'. */
+  answer_mode?: AnswerMode
   created_at: number
   updated_at: number
   deleted_at: number | null

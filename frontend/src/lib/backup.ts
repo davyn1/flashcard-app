@@ -39,7 +39,9 @@ const isNumOrNull = (v: unknown) => v === null || isNum(v)
 function validDeck(r: unknown) {
   return (
     isObj(r) && isStr(r.id) && isStr(r.name) && ['ko_en', 'en_ko', 'both'].includes(r.direction as string) &&
-    isNum(r.new_per_day) && typeof r.autoplay_audio === 'boolean' && isNum(r.created_at) && isNum(r.updated_at) &&
+    isNum(r.new_per_day) && typeof r.autoplay_audio === 'boolean' &&
+    (r.answer_mode === undefined || ['flip', 'type'].includes(r.answer_mode as string)) &&
+    isNum(r.created_at) && isNum(r.updated_at) &&
     isNumOrNull(r.deleted_at)
   )
 }

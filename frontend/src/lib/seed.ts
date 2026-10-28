@@ -36,6 +36,7 @@ export async function seedIfEmpty(): Promise<boolean> {
       direction: 'ko_en',
       new_per_day: 20,
       autoplay_audio: false,
+      answer_mode: 'flip',
       created_at: SEED_TS,
       updated_at: SEED_TS,
       deleted_at: null,

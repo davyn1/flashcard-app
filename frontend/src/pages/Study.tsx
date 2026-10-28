@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Icon } from '../components/ui'
+import { Button, Icon, imeGuard, inputClass } from '../components/ui'
+import { checkAnswer, suggestedRating, type AnswerResult } from '../lib/answer'
 import { db } from '../lib/db'
 import { deckCards, recordReview, statesForCards } from '../lib/repo'
 import { navigate } from '../lib/router'
@@ -61,6 +62,10 @@ export default function Study({ deckId }: { deckId: string }) {
   const [session, setSession] = useState<Session | null | 'missing'>(null)
   const [flipped, setFlipped] = useState(false)
   const [log, setLog] = useState<LogEntry[]>([])
+  // Typing mode: what was typed and how it compared to the answer (null until checked).
+  const [typed, setTyped] = useState('')
+  const [result, setResult] = useState<AnswerResult | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const voice = useKoreanVoice()
 
   // Snapshot the deck when the session starts; background syncs won't reshuffle the queue.
@@ -91,12 +96,25 @@ export default function Study({ deckId }: { deckId: string }) {
   const answer = card ? (current!.dir === 'fwd' ? card.back : card.front) : ''
   const koreanText = card ? (hasHangul(card.front) ? card.front : hasHangul(card.back) ? card.back : null) : null
   const koreanVisible = !!koreanText && (flipped || hasHangul(prompt))
+  const typeMode = s?.deck.answer_mode === 'type'
 
   const flip = useCallback(() => {
     if (!card || flipped) return
     setFlipped(true)
     if (s?.deck.autoplay_audio && koreanText) speakKorean(koreanText, voice)
   }, [card, flipped, s, koreanText, voice])
+
+  const check = useCallback(() => {
+    if (!card || flipped || !typed.trim()) return
+    setResult(checkAnswer(typed, answer))
+    flip()
+  }, [card, flipped, typed, answer, flip])
+
+  const giveUp = useCallback(() => {
+    if (!card || flipped) return
+    setResult('wrong')
+    flip()
+  }, [card, flipped, flip])
 
   // The UI advances immediately (computed with the same pure scheduler); the write to
   // IndexedDB happens in the background so fast keyboard input never gets dropped.
@@ -114,6 +132,8 @@ export default function Study({ deckId }: { deckId: string }) {
       })
       setLog((l) => [...l, { key: currentKey!, rating }])
       setFlipped(false)
+      setTyped('')
+      setResult(null)
       recordReview(card, current.dir, rating, now).catch((e) => console.error('Failed to save review', e))
     },
     [s, card, current, currentKey, flipped],
@@ -124,9 +144,11 @@ export default function Study({ deckId }: { deckId: string }) {
     if (s && currentKey && !card) setSession({ ...s, queue: s.queue.slice(1) })
   }, [s, currentKey, card])
 
-  // Keyboard: Space/Enter flips, 1–4 rate. Ignored while typing or composing Hangul.
-  const keys = useRef({ flipped, flip, rate })
-  keys.current = { flipped, flip, rate }
+  // Keyboard: Space/Enter flips, 1–4 rate. In typing mode, Enter in the box checks the answer
+  // (handled by the form) and Enter afterwards takes the suggested rating. Ignored while
+  // typing elsewhere or composing Hangul.
+  const keys = useRef({ flipped, flip, rate, typeMode, result })
+  keys.current = { flipped, flip, rate, typeMode, result }
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.repeat || isComposing(e) || e.metaKey || e.ctrlKey || e.altKey) return
@@ -134,8 +156,12 @@ export default function Study({ deckId }: { deckId: string }) {
       if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return
       const k = keys.current
       if (e.key === ' ' || e.key === 'Enter') {
+        // preventDefault also stops this Enter from submitting the next card's answer box.
         e.preventDefault()
-        if (!k.flipped) k.flip()
+        if (k.typeMode) {
+          if (!k.flipped) inputRef.current?.focus()
+          else if (e.key === 'Enter' && k.result) k.rate(suggestedRating(k.result))
+        } else if (!k.flipped) k.flip()
       } else if (['1', '2', '3', '4'].includes(e.key) && k.flipped) {
         e.preventDefault()
         k.rate(Number(e.key) as Rating)
@@ -164,6 +190,7 @@ export default function Study({ deckId }: { deckId: string }) {
   const delays = previewDelays(rec ? toScheduling(rec) : newState(now), now)
   const done = log.length
   const left = s!.queue.length
+  const suggested = typeMode && result ? suggestedRating(result) : null
 
   return (
     <div className="flex h-dvh flex-col">
@@ -188,8 +215,8 @@ export default function Study({ deckId }: { deckId: string }) {
       {/* Card */}
       <div className="px-safe flex min-h-0 flex-1 flex-col">
         <div
-          className="mx-auto flex w-full max-w-2xl flex-1 cursor-pointer flex-col overflow-y-auto px-4 py-2 select-none"
-          onClick={flip}
+          className={`mx-auto flex w-full max-w-2xl flex-1 flex-col overflow-y-auto px-4 py-2 ${typeMode ? '' : 'cursor-pointer select-none'}`}
+          onClick={typeMode ? undefined : flip}
         >
           <div className="relative flex flex-1 flex-col items-center justify-center rounded-3xl bg-white px-5 py-8 text-center shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
             {voice && koreanVisible && (
@@ -212,6 +239,7 @@ export default function Study({ deckId }: { deckId: string }) {
             </div>
             {flipped ? (
               <div className="mt-6 w-full border-t border-slate-200 pt-6 dark:border-slate-700">
+                {typeMode && result && <Feedback result={result} typed={typed} />}
                 <div
                   lang={hasHangul(answer) ? 'ko' : 'en'}
                   className={`hangul font-semibold text-indigo-700 dark:text-indigo-300 ${answerSize(answer)}`}
@@ -222,6 +250,33 @@ export default function Study({ deckId }: { deckId: string }) {
                   <p className="hangul mt-4 whitespace-pre-line text-slate-600 dark:text-slate-400">{card.notes}</p>
                 )}
               </div>
+            ) : typeMode ? (
+              <form
+                className="mt-8 w-full max-w-md"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  check()
+                }}
+                onKeyDownCapture={imeGuard}
+              >
+                <input
+                  key={currentKey}
+                  ref={inputRef}
+                  autoFocus
+                  value={typed}
+                  onChange={(e) => setTyped(e.target.value)}
+                  placeholder="Type the answer"
+                  aria-label="Your answer"
+                  lang={hasHangul(answer) ? 'ko' : 'en'}
+                  className={`${inputClass} hangul text-center text-xl`}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  enterKeyHint="done"
+                  maxLength={500}
+                />
+              </form>
             ) : (
               <div className="mt-8 text-sm text-slate-400">Tap to reveal</div>
             )}
@@ -232,7 +287,16 @@ export default function Study({ deckId }: { deckId: string }) {
       {/* Answer controls: bottom of the screen for thumbs */}
       <div className="pb-safe px-safe">
         <div className="mx-auto max-w-2xl px-4 pt-2 pb-4">
-          {!flipped ? (
+          {!flipped && typeMode ? (
+            <div className="grid grid-cols-[1fr_2fr] gap-2">
+              <Button className="h-14" onClick={giveUp}>
+                Don't know
+              </Button>
+              <Button variant="primary" className="h-14 text-lg" onClick={check} disabled={!typed.trim()}>
+                Check <kbd className="hidden text-xs opacity-70 sm:inline">Enter</kbd>
+              </Button>
+            </div>
+          ) : !flipped ? (
             <Button variant="primary" className="h-14 w-full text-lg" onClick={flip}>
               Show answer <kbd className="hidden text-xs opacity-70 sm:inline">Space</kbd>
             </Button>
@@ -242,7 +306,14 @@ export default function Study({ deckId }: { deckId: string }) {
                 <button
                   key={r}
                   onClick={() => rate(r)}
-                  className={`flex h-16 flex-col items-center justify-center rounded-xl text-white transition-colors select-none ${ratingStyle[r]}`}
+                  aria-describedby={r === suggested ? 'suggested-hint' : undefined}
+                  className={`flex h-16 flex-col items-center justify-center rounded-xl text-white transition-colors select-none ${ratingStyle[r]} ${
+                    r === suggested
+                      ? 'ring-4 ring-slate-900 ring-offset-2 ring-offset-slate-50 dark:ring-white dark:ring-offset-slate-950'
+                      : suggested
+                        ? 'opacity-70'
+                        : ''
+                  }`}
                 >
                   <span className="font-semibold">{RATING_LABELS[r]}</span>
                   <span className="text-xs opacity-85">
@@ -253,8 +324,34 @@ export default function Study({ deckId }: { deckId: string }) {
               ))}
             </div>
           )}
+          {flipped && suggested && (
+            <p id="suggested-hint" className="mt-2 text-center text-xs text-slate-500">
+              Suggested: {RATING_LABELS[suggested]}
+              <span className="hidden sm:inline"> · press Enter</span> — or pick another
+            </p>
+          )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function Feedback({ result, typed }: { result: AnswerResult; typed: string }) {
+  if (result === 'correct') {
+    return <p className="mb-4 text-lg font-semibold text-emerald-600 dark:text-emerald-400">✓ Correct</p>
+  }
+  const tone = result === 'close' ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
+  return (
+    <div className="mb-4">
+      <p className={`text-lg font-semibold ${tone}`}>{result === 'close' ? 'Almost — check the spelling' : '✗ Not quite'}</p>
+      {typed.trim() ? (
+        <p className="hangul mt-1 text-slate-600 dark:text-slate-400">
+          You typed: <span className={result === 'wrong' ? 'line-through' : ''}>{typed}</span>
+        </p>
+      ) : (
+        <p className="mt-1 text-slate-500">No answer given</p>
+      )}
+      <p className="mt-3 text-xs font-medium tracking-wide text-slate-400 uppercase">Answer</p>
     </div>
   )
 }

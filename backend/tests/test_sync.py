@@ -16,6 +16,7 @@ def deck(updated_at=1000, **kw):
         "direction": "ko_en",
         "new_per_day": 20,
         "autoplay_audio": False,
+        "answer_mode": "flip",
         "created_at": 1000,
         "updated_at": updated_at,
         "deleted_at": None,
@@ -125,6 +126,14 @@ def test_pull_since_returns_only_newer_changes(client, auth, clock):
     assert [c["id"] for c in second["cards"]] == [CARD_ID]
 
 
+def test_deck_answer_mode_roundtrips_and_defaults_to_flip(client, auth):
+    push(client, auth, decks=[deck(answer_mode="type")])
+    assert pull(client, auth)["decks"][0]["answer_mode"] == "type"
+    older_client = {k: v for k, v in deck(updated_at=2000).items() if k != "answer_mode"}
+    push(client, auth, decks=[older_client])
+    assert pull(client, auth)["decks"][0]["answer_mode"] == "flip"
+
+
 def test_last_write_wins_newer_update_applies(client, auth):
     push(client, auth, cards=[card(updated_at=1000, back="water")])
     res = push(client, auth, cards=[card(updated_at=2000, back="water (drink)")])
@@ -213,6 +222,7 @@ def test_server_normalizes_text_to_nfc(client, auth):
         {"cards": [card(updated_at=-1)]},
         {"decks": [deck(direction="sideways")]},
         {"decks": [deck(name="")]},
+        {"decks": [deck(answer_mode="quiz")]},
         {"card_states": [state(id=f"{uuid.uuid4()}:fwd")]},  # id doesn't match card_id
         {"card_states": [state(ease=0.5)]},
         {"reviews": [review(rating=5)]},

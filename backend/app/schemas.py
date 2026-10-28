@@ -31,6 +31,8 @@ class DeckRecord(_Record):
     direction: Literal["ko_en", "en_ko", "both"]
     new_per_day: int = Field(ge=0, le=9999)
     autoplay_audio: bool
+    # Optional so clients from before this field existed can still push.
+    answer_mode: Literal["flip", "type"] = "flip"
     created_at: Ms
     updated_at: Ms
     deleted_at: Ms | None = None

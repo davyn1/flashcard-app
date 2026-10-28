@@ -23,6 +23,8 @@ class Deck(Base):
     direction: Mapped[str] = mapped_column(String(8), default="ko_en")
     new_per_day: Mapped[int] = mapped_column(Integer, default=20)
     autoplay_audio: Mapped[bool] = mapped_column(Boolean, default=False)
+    # "flip" | "type" (type the answer before revealing it)
+    answer_mode: Mapped[str] = mapped_column(String(8), default="flip", server_default="flip")
     created_at: Mapped[int] = mapped_column(BigInteger)
     updated_at: Mapped[int] = mapped_column(BigInteger)
     deleted_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
