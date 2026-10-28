@@ -15,7 +15,8 @@ import Study from './pages/Study'
 
 function route(path: string): ReactNode {
   let p: Record<string, string> | null
-  if ((p = match('/deck/:id/study', path))) return <Study key={p.id} deckId={p.id} />
+  if ((p = match('/deck/:id/study', path))) return <Study key={`flip-${p.id}`} deckId={p.id} mode="flip" />
+  if ((p = match('/deck/:id/type', path))) return <Study key={`type-${p.id}`} deckId={p.id} mode="type" />
   if ((p = match('/deck/:id/new', path))) return <CardEdit key={`new-${p.id}`} deckId={p.id} />
   if ((p = match('/deck/:id/import', path))) return <Import deckId={p.id} />
   if ((p = match('/deck/:id/stats', path))) return <Stats deckId={p.id} />
@@ -63,7 +64,7 @@ export default function App() {
     )
   }
 
-  const studying = !!match('/deck/:id/study', path)
+  const studying = !!match('/deck/:id/study', path) || !!match('/deck/:id/type', path)
   return (
     <>
       {sync.status === 'auth' && !studying && <ReauthBanner />}

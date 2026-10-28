@@ -52,14 +52,18 @@ export default function DeckView({ deckId }: { deckId: string }) {
           <Stat label="New today" value={summary.new} tone="text-emerald-600 dark:text-emerald-400" />
           <Stat label="Total" value={summary.total} />
         </div>
-        <Button
-          variant="primary"
-          className="mt-4 w-full text-lg"
-          disabled={summary.due + summary.new === 0}
-          onClick={() => navigate(`/deck/${deck.id}/study`)}
-        >
-          {summary.due + summary.new === 0 ? 'All done for today 🎉' : 'Study now'}
-        </Button>
+        {summary.due + summary.new === 0 ? (
+          <p className="mt-4 text-center font-medium text-slate-500">All done for today 🎉</p>
+        ) : (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button variant="primary" className="h-14 text-lg" onClick={() => navigate(`/deck/${deck.id}/study`)}>
+              <Icon name="cards" /> Flashcards
+            </Button>
+            <Button variant="primary" className="h-14 text-lg" onClick={() => navigate(`/deck/${deck.id}/type`)}>
+              <Icon name="keyboard" /> Typing Mode
+            </Button>
+          </div>
+        )}
       </section>
 
       <div className="mt-4 grid grid-cols-2 gap-2">

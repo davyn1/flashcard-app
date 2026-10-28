@@ -282,10 +282,11 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
   or turn on auto-play audio per deck in the deck's ⚙ screen. The speaker is hidden on devices
   with no Korean voice installed (see **Korean audio on iPhone** above). Put romanization in a
   card's notes if you want a reading aid while you learn the script.
-- **Studying:** tap the card or press **Space** to flip, then tap a rating or press **1–4**.
+- **Study modes:** on a deck, pick **Flashcards** or **Typing Mode**. Both study the same due
+  and new cards and update the same schedule, so use whichever you like each time.
+- **Flashcards:** tap the card or press **Space** to flip, then tap a rating or press **1–4**.
   **Esc** ends the session.
-- **Typing answers:** in a deck's ⚙ screen, set **How to answer** to **Type the answer**. Each
-  card then shows a box: type your guess and press **Enter** (or **Don't know**). The app
+- **Typing Mode:** each card shows a box: type your guess and press **Enter** (or **Don't know**). The app
   checks it, ignoring case, punctuation, spacing and a leading "to"/"a"/"the", and accepting
   any meaning separated by `,` `;` or `/`. A small typo counts as "almost". It then highlights
   a suggested rating (Good, Hard or Again); press **Enter** to take it or pick another.

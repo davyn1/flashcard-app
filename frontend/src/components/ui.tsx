@@ -17,6 +17,8 @@ const paths = {
   upload: 'M12 16V4m0 0l-5 5m5-5l5 5M4 20h16',
   sliders: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4',
   trash: 'M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3',
+  cards: 'M8 4h11a1 1 0 011 1v11M4 8h11a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z',
+  keyboard: 'M3 6h18a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V7a1 1 0 011-1zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8',
 } as const
 
 export function Icon({ name, className = 'h-5 w-5' }: { name: keyof typeof paths; className?: string }) {

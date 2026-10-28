@@ -16,7 +16,15 @@ import {
 import { speakKorean, useKoreanVoice } from '../lib/speech'
 import { sessionQueue } from '../lib/study'
 import { hasHangul, isComposing } from '../lib/text'
-import { fromScheduling, toScheduling, type Card, type CardDir, type CardStateRecord, type Deck } from '../lib/types'
+import {
+  fromScheduling,
+  toScheduling,
+  type AnswerMode,
+  type Card,
+  type CardDir,
+  type CardStateRecord,
+  type Deck,
+} from '../lib/types'
 
 interface Session {
   deck: Deck
@@ -58,7 +66,8 @@ const ratingStyle: Record<Rating, string> = {
   4: 'bg-sky-600 hover:bg-sky-500 active:bg-sky-700',
 }
 
-export default function Study({ deckId }: { deckId: string }) {
+/** mode: flip = classic flashcards; type = type a guess, the app checks it. */
+export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMode }) {
   const [session, setSession] = useState<Session | null | 'missing'>(null)
   const [flipped, setFlipped] = useState(false)
   const [log, setLog] = useState<LogEntry[]>([])
@@ -96,7 +105,7 @@ export default function Study({ deckId }: { deckId: string }) {
   const answer = card ? (current!.dir === 'fwd' ? card.back : card.front) : ''
   const koreanText = card ? (hasHangul(card.front) ? card.front : hasHangul(card.back) ? card.back : null) : null
   const koreanVisible = !!koreanText && (flipped || hasHangul(prompt))
-  const typeMode = s?.deck.answer_mode === 'type'
+  const typeMode = mode === 'type'
 
   const flip = useCallback(() => {
     if (!card || flipped) return
