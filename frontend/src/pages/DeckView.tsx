@@ -41,7 +41,7 @@ export default function DeckView({ deckId }: { deckId: string }) {
             <Icon name="chart" />
           </a>
           <a href={`#/deck/${deck.id}/settings`} className="tap-icon" aria-label="Deck settings">
-            <Icon name="sliders" />
+            <Icon name="gear" />
           </a>
         </>
       }
