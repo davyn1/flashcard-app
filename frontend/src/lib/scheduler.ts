@@ -45,6 +45,8 @@ export interface SchedulerConfig {
   minEase: number
   easyBonus: number
   hardMultiplier: number
+  /** Delay (minutes) when a learning/relearning card is rated Hard. Review cards use hardMultiplier. */
+  hardLearningDelay: number
   /** New interval after a lapse = max(1, old * lapseMultiplier). 0 = classic SM-2 reset to 1 day. */
   lapseMultiplier: number
   maxInterval: number
@@ -61,6 +63,7 @@ export const DEFAULT_CONFIG: SchedulerConfig = {
   minEase: 1.3,
   easyBonus: 1.3,
   hardMultiplier: 1.2,
+  hardLearningDelay: 60,
   lapseMultiplier: 0,
   maxInterval: 36500,
   requeueGap: { 1: 3, 2: 5, 3: 8, 4: 8 },
@@ -87,14 +90,9 @@ function clampEase(ease: number, config: SchedulerConfig): number {
   return Math.round(Math.max(config.minEase, ease) * 100) / 100
 }
 
-function stepDelayMinutes(steps: number[], step: number, rating: Rating): number {
-  const current = steps[Math.min(step, steps.length - 1)]
-  if (rating === 2) {
-    // Hard: halfway to the next step (or 1.5x the last one).
-    const next = steps[step + 1]
-    return next !== undefined ? (current + next) / 2 : current * 1.5
-  }
-  return current
+function stepDelayMinutes(steps: number[], step: number, rating: Rating, config: SchedulerConfig): number {
+  if (rating === 2) return config.hardLearningDelay
+  return steps[Math.min(step, steps.length - 1)]
 }
 
 /** Day-based intervals for a card in review, guaranteeing Hard < Good < Easy. */
@@ -146,7 +144,7 @@ export function review(
         state: 'learning',
         step: nextStep,
         reps: 0,
-        due: now + stepDelayMinutes(steps, nextStep, rating) * MINUTE,
+        due: now + stepDelayMinutes(steps, nextStep, rating, config) * MINUTE,
       }
     }
 
@@ -159,7 +157,7 @@ export function review(
         return { ...s, step: next, due: now + steps[next] * MINUTE }
       }
       const nextStep = rating === 1 ? 0 : prev.step
-      return { ...s, step: nextStep, due: now + stepDelayMinutes(steps, nextStep, rating) * MINUTE }
+      return { ...s, step: nextStep, due: now + stepDelayMinutes(steps, nextStep, rating, config) * MINUTE }
     }
 
     case 'review': {

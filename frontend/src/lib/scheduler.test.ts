@@ -64,10 +64,20 @@ describe('new cards / learning steps', () => {
     expect(s.interval).toBe(DEFAULT_CONFIG.easyInterval)
   })
 
-  it('Hard repeats the current step with a slightly longer delay', () => {
+  it('Hard repeats the current step and is due again in 1 hour', () => {
     const s = review(newState(NOW), 2, NOW)
     expect(s).toMatchObject({ state: 'learning', step: 0 })
-    expect(s.due).toBe(NOW + 5.5 * MIN) // halfway between 1m and 10m
+    expect(s.due).toBe(NOW + 60 * MIN)
+    const later = review(review(newState(NOW), 3, NOW), 2, NOW)
+    expect(later).toMatchObject({ state: 'learning', step: 1 })
+    expect(later.due).toBe(NOW + 60 * MIN)
+  })
+
+  it('Hard while relearning is also due in 1 hour, without changing the reset interval', () => {
+    const lapsed = review(reviewCard({ interval: 30 }), 1, NOW)
+    const s = review(lapsed, 2, NOW)
+    expect(s).toMatchObject({ state: 'relearning', interval: 1 })
+    expect(s.due).toBe(NOW + 60 * MIN)
   })
 
   it('Again during learning goes back to the first step without counting a lapse', () => {
@@ -152,6 +162,7 @@ describe('previewDelays / formatDelay', () => {
   it('previews delays for each rating', () => {
     const p = previewDelays(newState(NOW), NOW)
     expect(formatDelay(p[1])).toBe('1m')
+    expect(formatDelay(p[2])).toBe('1h')
     expect(formatDelay(p[3])).toBe('10m')
     expect(formatDelay(p[4])).toBe('4d')
     expect(formatDelay(30 * 1000)).toBe('<1m')

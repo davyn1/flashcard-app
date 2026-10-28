@@ -19,7 +19,9 @@ render.yaml          optional Render blueprint for the backend
   simplified SM-2, written as pure functions with unit tests. After each card you rate it
   **Again / Hard / Good / Easy**:
   - New cards go through short learning steps (1 min, 10 min) and are shown again later in the
-    same session before they graduate to a 1-day interval. *Easy* skips straight to 4 days.
+    same session before they graduate to a 1-day interval. *Hard* keeps the card on its current
+    step and makes it due again in 1 hour (it still repeats later in the session). *Easy* skips
+    straight to 4 days.
   - Review cards grow their interval: *Hard* ×1.2, *Good* ×ease, *Easy* ×ease×1.3. The ease
     factor starts at 2.5, drops by 0.15 on *Hard*, rises by 0.15 on *Easy*, and never goes below 1.3.
   - *Again* on a learned card counts a lapse, lowers ease by 0.2, and sends the card to
