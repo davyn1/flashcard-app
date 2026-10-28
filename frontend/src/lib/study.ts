@@ -14,9 +14,9 @@ import {
 export function studyCandidates(deck: Deck, cards: Card[], states: Map<string, CardStateRecord>): QueueCandidate[] {
   const dirs = dirsFor(deck.direction)
   return cards.flatMap((c) =>
-    dirs.map((dir, order) => {
+    dirs.map((dir) => {
       const rec = states.get(stateId(c.id, dir))
-      return { key: stateId(c.id, dir), state: rec ? toScheduling(rec) : null, createdAt: c.created_at, order }
+      return { key: stateId(c.id, dir), state: rec ? toScheduling(rec) : null }
     }),
   )
 }

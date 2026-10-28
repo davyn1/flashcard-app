@@ -175,46 +175,70 @@ describe('previewDelays / formatDelay', () => {
 })
 
 describe('buildQueue', () => {
-  it('puts due cards first (most overdue, then lowest ease), then new cards up to the limit', () => {
-    const q = buildQueue(
-      [
-        { key: 'new-b', state: null, createdAt: 2 },
-        { key: 'due-recent', state: reviewCard({ due: NOW - DAY }), createdAt: 0 },
-        { key: 'due-old', state: reviewCard({ due: NOW - 5 * DAY }), createdAt: 0 },
-        { key: 'due-same-low-ease', state: reviewCard({ due: NOW - DAY, ease: 1.5 }), createdAt: 0 },
-        { key: 'not-due', state: reviewCard({ due: NOW + 3 * DAY }), createdAt: 0 },
-        { key: 'new-a', state: null, createdAt: 1 },
-        { key: 'new-c', state: null, createdAt: 3 },
-      ],
-      NOW,
-      2,
-    )
-    expect(q).toEqual(['due-old', 'due-same-low-ease', 'due-recent', 'new-a', 'new-b'])
+  /** Deterministic pseudo-random numbers for repeatable shuffles. */
+  const seeded = (seed: number) => () => {
+    // mulberry32
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 2 ** 32
+  }
+  const due = (key: string, daysAgo = 1) => ({ key, state: reviewCard({ due: NOW - daysAgo * DAY }) })
+  const fresh = (key: string) => ({ key, state: null })
+
+  it('puts due cards first, then new cards up to the limit', () => {
+    const candidates = [
+      fresh('new-a'),
+      due('due-1'),
+      due('due-2', 5),
+      { key: 'not-due', state: reviewCard({ due: NOW + 3 * DAY }) },
+      fresh('new-b'),
+      due('due-3'),
+      fresh('new-c'),
+    ]
+    for (let seed = 1; seed <= 20; seed++) {
+      const q = buildQueue(candidates, NOW, 2, seeded(seed))
+      expect(q).toHaveLength(5)
+      expect(new Set(q.slice(0, 3))).toEqual(new Set(['due-1', 'due-2', 'due-3']))
+      expect(q.slice(3).every((k) => k.startsWith('new-'))).toBe(true)
+      expect(q).not.toContain('not-due')
+    }
   })
 
   it('includes cards due later today and learning cards', () => {
     const q = buildQueue(
       [
-        { key: 'later-today', state: reviewCard({ due: NOW + 3 * 3600_000 }), createdAt: 0 },
-        { key: 'learning', state: { ...newState(NOW), state: 'learning', due: NOW + MIN }, createdAt: 0 },
+        { key: 'later-today', state: reviewCard({ due: NOW + 3 * 3600_000 }) },
+        { key: 'learning', state: { ...newState(NOW), state: 'learning', due: NOW + MIN } },
       ],
       NOW,
       0,
     )
-    expect(q).toEqual(['learning', 'later-today'])
+    expect(new Set(q)).toEqual(new Set(['learning', 'later-today']))
   })
 
-  it('orders new cards by direction order before creation time', () => {
-    const q = buildQueue(
-      [
-        { key: 'a:rev', state: null, createdAt: 1, order: 1 },
-        { key: 'a:fwd', state: null, createdAt: 1, order: 0 },
-        { key: 'b:fwd', state: null, createdAt: 2, order: 0 },
-      ],
-      NOW,
-      10,
-    )
-    expect(q).toEqual(['a:fwd', 'b:fwd', 'a:rev'])
+  it('shuffles reviews, and picks new cards at random rather than oldest first', () => {
+    const candidates = [
+      ...Array.from({ length: 10 }, (_, i) => due(`due-${i}`)),
+      ...Array.from({ length: 30 }, (_, i) => fresh(`new-${i}`)),
+    ]
+    const orders = new Set<string>()
+    const picked = new Set<string>()
+    for (let seed = 1; seed <= 20; seed++) {
+      const q = buildQueue(candidates, NOW, 5, seeded(seed))
+      orders.add(q.slice(0, 10).join(','))
+      q.slice(10).forEach((k) => picked.add(k))
+    }
+    expect(orders.size).toBeGreaterThan(15) // review order differs between sessions
+    expect(picked.size).toBeGreaterThan(20) // new cards come from the whole pool, not just the first 5
+  })
+
+  it('keeps the two directions of the same word apart', () => {
+    const candidates = ['a', 'b', 'c', 'd'].flatMap((id) => [fresh(`${id}:fwd`), fresh(`${id}:rev`)])
+    for (let seed = 1; seed <= 50; seed++) {
+      const q = buildQueue(candidates, NOW, 8, seeded(seed))
+      for (let i = 1; i < q.length; i++) expect(q[i].split(':')[0]).not.toBe(q[i - 1].split(':')[0])
+    }
   })
 })
 

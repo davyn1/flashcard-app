@@ -27,8 +27,9 @@ render.yaml          optional Render blueprint for the backend
     *Good* then sends it back out for 2 days.
     (Again during *initial* learning just restarts the steps and doesn't count as a lapse,
     so brand-new words don't get flagged as "struggling" on their first day.)
-  - Each session shows due cards first (most overdue, then lowest ease), then up to the
-    deck's daily limit of new cards (default 20).
+  - Each session shows the cards due for review first, then up to the deck's daily limit of
+    new cards (default 20), picked at random from all your new cards. Both groups are shuffled
+    every session, and the two directions of the same word are never shown back to back.
 - **Offline-first.** All data lives in IndexedDB. Every change is written locally first and
   queued in an outbox. The sync engine pushes the outbox and pulls server changes when the
   app opens, every minute while it's visible, when the connection comes back, and shortly

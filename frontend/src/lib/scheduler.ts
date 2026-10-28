@@ -239,26 +239,68 @@ export interface QueueCandidate {
   key: string
   /** null = never studied (new). */
   state: SchedulingState | null
-  /** Used to order new cards (oldest first). */
-  createdAt: number
-  /** Secondary ordering of new cards, e.g. 0 for Korean→English, 1 for English→Korean. */
-  order?: number
+}
+
+/** Fisher–Yates shuffle (returns a new array). `random` is injectable for tests. */
+export function shuffle<T>(items: T[], random: () => number = Math.random): T[] {
+  const a = [...items]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+/** Queue keys are `${cardId}:${dir}`; two keys with the same card id are the same word. */
+function cardOf(key: string): string {
+  const i = key.lastIndexOf(':')
+  return i < 0 ? key : key.slice(0, i)
 }
 
 /**
- * Build the session queue: due cards first (most overdue, then lowest ease),
- * followed by up to `newLimit` new cards.
+ * Reorder as little as possible so the two directions of the same word aren't back to back
+ * (the first would give away the second). Takes cards in order, skipping ahead past a card
+ * that would sit next to its sibling; a leftover clash at the end is moved to the first
+ * earlier gap where it fits.
  */
-export function buildQueue(candidates: QueueCandidate[], now: number, newLimit: number): string[] {
+function separateSiblings(keys: string[]): string[] {
+  const pool = [...keys]
+  const out: string[] = []
+  while (pool.length) {
+    const prev = out.at(-1)
+    const idx = pool.findIndex((k) => prev === undefined || cardOf(k) !== cardOf(prev))
+    out.push(pool.splice(Math.max(idx, 0), 1)[0])
+  }
+  for (let i = out.length - 1; i > 0; i--) {
+    if (cardOf(out[i]) !== cardOf(out[i - 1])) continue
+    const [item] = out.splice(i, 1)
+    const fits = (p: number) =>
+      (p === 0 || cardOf(out[p - 1]) !== cardOf(item)) && (p === out.length || cardOf(out[p]) !== cardOf(item))
+    let p = 0
+    while (p <= out.length && !fits(p)) p++
+    out.splice(p <= out.length ? p : i, 0, item)
+  }
+  return out
+}
+
+/**
+ * Build the session queue: cards due for review first, then up to `newLimit` new cards
+ * picked at random from all the new ones. Both groups are shuffled so words don't come up
+ * in the same order every time.
+ */
+export function buildQueue(
+  candidates: QueueCandidate[],
+  now: number,
+  newLimit: number,
+  random: () => number = Math.random,
+): string[] {
   const cutoff = endOfDay(now)
-  const due = candidates
-    .filter((c) => c.state && c.state.state !== 'new' && c.state.due <= cutoff)
-    .sort((a, b) => a.state!.due - b.state!.due || a.state!.ease - b.state!.ease)
-  const fresh = candidates
-    .filter((c) => !c.state || c.state.state === 'new')
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.createdAt - b.createdAt)
-    .slice(0, Math.max(0, newLimit))
-  return [...due, ...fresh].map((c) => c.key)
+  const due = candidates.filter((c) => c.state && c.state.state !== 'new' && c.state.due <= cutoff)
+  const fresh = shuffle(
+    candidates.filter((c) => !c.state || c.state.state === 'new'),
+    random,
+  ).slice(0, Math.max(0, newLimit))
+  return separateSiblings([...shuffle(due, random), ...fresh].map((c) => c.key))
 }
 
 /**
