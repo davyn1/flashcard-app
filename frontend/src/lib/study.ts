@@ -1,4 +1,4 @@
-import { buildQueue, countDue, startOfDay, type QueueCandidate } from './scheduler'
+import { buildQueue, countDue, separateSiblings, shuffle, startOfDay, type QueueCandidate } from './scheduler'
 import {
   dirsFor,
   stateId,
@@ -95,4 +95,12 @@ export function sessionQueue(
   now: number,
 ): string[] {
   return buildQueue(studyCandidates(deck, cards, states), now, newLimitRemaining(deck, cards, states, now))
+}
+
+/**
+ * A practice run over every card in the deck (all active directions), shuffled. Used when
+ * nothing is due so the user can keep studying; the caller must not reschedule from it.
+ */
+export function practiceQueue(deck: Deck, cards: Card[], states: Map<string, CardStateRecord>): string[] {
+  return separateSiblings(shuffle(studyCandidates(deck, cards, states).map((c) => c.key)))
 }

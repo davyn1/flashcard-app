@@ -14,7 +14,7 @@ import {
   type Rating,
 } from '../lib/scheduler'
 import { speakKorean, useKoreanVoice } from '../lib/speech'
-import { sessionQueue, shownDirection } from '../lib/study'
+import { practiceQueue, sessionQueue, shownDirection } from '../lib/study'
 import { hasHangul, isComposing } from '../lib/text'
 import {
   answerSide,
@@ -32,6 +32,8 @@ interface Session {
   cards: Map<string, Card>
   states: Map<string, CardStateRecord>
   queue: string[]
+  /** No cards were due, so this is a free practice run that must not touch the schedule. */
+  practice: boolean
 }
 
 interface LogEntry {
@@ -79,12 +81,20 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   const [result, setResult] = useState<AnswerResult | null>(null)
   /** You overrode the checker and saved your answer as correct for this card. */
   const [savedAnswer, setSavedAnswer] = useState(false)
+  // Bumped by "Practice again" to start a fresh session over the same deck.
+  const [runId, setRunId] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const voice = useKoreanVoice()
 
   // Snapshot the deck when the session starts; background syncs won't reshuffle the queue.
   useEffect(() => {
     let cancelled = false
+    setSession(null)
+    setLog([])
+    setFlipped(false)
+    setTyped('')
+    setResult(null)
+    setSavedAnswer(false)
     ;(async () => {
       const deck = await db.decks.get(deckId)
       if (!deck || deck.deleted_at) {
@@ -93,13 +103,17 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
       }
       const cards = await deckCards(deckId)
       const states = await statesForCards(cards.map((c) => c.id))
-      const queue = sessionQueue(deck, cards, states, Date.now())
-      if (!cancelled) setSession({ deck, cards: new Map(cards.map((c) => [c.id, c])), states, queue })
+      const due = sessionQueue(deck, cards, states, Date.now())
+      // Nothing due: fall back to a practice run over the whole deck. Ratings in a practice
+      // session don't reschedule, so the spaced-repetition schedule is left untouched.
+      const practice = due.length === 0
+      const queue = practice ? practiceQueue(deck, cards, states) : due
+      if (!cancelled) setSession({ deck, cards: new Map(cards.map((c) => [c.id, c])), states, queue, practice })
     })()
     return () => {
       cancelled = true
     }
-  }, [deckId])
+  }, [deckId, runId])
 
   const s = session && session !== 'missing' ? session : null
   const currentKey = s?.queue[0]
@@ -125,6 +139,7 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   const koreanText = card ? (hasHangul(card.front) ? card.front : hasHangul(card.back) ? card.back : null) : null
   const koreanVisible = !!koreanText && (flipped || hasHangul(prompt))
   const typeMode = mode === 'type'
+  const practice = s?.practice ?? false
 
   const flip = useCallback(() => {
     if (!card || flipped) return
@@ -162,9 +177,20 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
 
   // The UI advances immediately (computed with the same pure scheduler); the write to
   // IndexedDB happens in the background so fast keyboard input never gets dropped.
+  // Practice mode: move to the next card without recording a review or rescheduling.
+  const advance = useCallback(() => {
+    if (!s || !card || !current || !flipped) return
+    setLog((l) => [...l, { key: currentKey!, rating: 3, shown }])
+    setSession({ ...s, queue: s.queue.slice(1) })
+    setFlipped(false)
+    setTyped('')
+    setResult(null)
+    setSavedAnswer(false)
+  }, [s, card, current, currentKey, flipped, shown])
+
   const rate = useCallback(
     (rating: Rating) => {
-      if (!s || !card || !current || !flipped) return
+      if (!s || !card || !current || !flipped || s.practice) return
       const now = Date.now()
       const prevRec = s.states.get(currentKey!)
       const next = review(prevRec ? toScheduling(prevRec) : newState(now), rating, now)
@@ -192,8 +218,8 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   // Keyboard: Space/Enter flips, 1–4 rate. In typing mode, Enter in the box checks the answer
   // (handled by the form) and Enter afterwards takes the suggested rating. Ignored while
   // typing elsewhere or composing Hangul.
-  const keys = useRef({ flipped, flip, rate, typeMode, result })
-  keys.current = { flipped, flip, rate, typeMode, result }
+  const keys = useRef({ flipped, flip, rate, advance, typeMode, result, practice })
+  keys.current = { flipped, flip, rate, advance, typeMode, result, practice }
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.repeat || isComposing(e) || e.metaKey || e.ctrlKey || e.altKey) return
@@ -203,11 +229,16 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
       if (e.key === ' ' || e.key === 'Enter') {
         // preventDefault also stops this Enter from submitting the next card's answer box.
         e.preventDefault()
-        if (k.typeMode) {
-          if (!k.flipped) inputRef.current?.focus()
-          else if (e.key === 'Enter' && k.result) k.rate(suggestedRating(k.result))
-        } else if (!k.flipped) k.flip()
-      } else if (['1', '2', '3', '4'].includes(e.key) && k.flipped) {
+        if (k.flipped) {
+          // Practice: advance to the next card. Normal typing: Enter takes the suggested rating.
+          if (k.practice) k.advance()
+          else if (k.typeMode && e.key === 'Enter' && k.result) k.rate(suggestedRating(k.result))
+        } else if (k.typeMode) {
+          inputRef.current?.focus()
+        } else {
+          k.flip()
+        }
+      } else if (['1', '2', '3', '4'].includes(e.key) && k.flipped && !k.practice) {
         e.preventDefault()
         k.rate(Number(e.key) as Rating)
       } else if (e.key === 'Escape') {
@@ -227,7 +258,16 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
       </div>
     )
   }
-  if (!currentKey) return <Summary deck={session.deck} log={log} cards={session.cards} />
+  if (!currentKey)
+    return (
+      <Summary
+        deck={session.deck}
+        log={log}
+        cards={session.cards}
+        practice={session.practice}
+        onAgain={() => setRunId((n) => n + 1)}
+      />
+    )
   if (!card) return null
 
   const rec = s!.states.get(currentKey)
@@ -245,6 +285,11 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
           <a href={`#/deck/${deckId}`} className="tap-icon" aria-label="End session">
             <Icon name="x" className="h-6 w-6" />
           </a>
+          {practice && (
+            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+              Practice
+            </span>
+          )}
           <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
             <div
               className="h-full rounded-full bg-indigo-600 transition-all"
@@ -347,6 +392,10 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
             <Button variant="primary" className="h-14 w-full text-lg" onClick={flip}>
               Show answer <kbd className="hidden text-xs opacity-70 sm:inline">Space</kbd>
             </Button>
+          ) : practice ? (
+            <Button variant="primary" className="h-14 w-full text-lg" onClick={advance}>
+              Next <kbd className="hidden text-xs opacity-70 sm:inline">Space</kbd>
+            </Button>
           ) : (
             <div className="grid grid-cols-4 gap-2">
               {([1, 2, 3, 4] as Rating[]).map((r) => (
@@ -371,7 +420,7 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
               ))}
             </div>
           )}
-          {flipped && suggested && (
+          {flipped && !practice && suggested && (
             <p id="suggested-hint" className="mt-2 text-center text-xs text-slate-500">
               Suggested: {RATING_LABELS[suggested]}
               <span className="hidden sm:inline"> · press Enter</span> — or pick another
@@ -431,16 +480,57 @@ function Feedback({
   )
 }
 
-function Summary({ deck, log, cards }: { deck: Deck; log: LogEntry[]; cards: Map<string, Card> }) {
+function Summary({
+  deck,
+  log,
+  cards,
+  practice,
+  onAgain,
+}: {
+  deck: Deck
+  log: LogEntry[]
+  cards: Map<string, Card>
+  practice: boolean
+  onAgain: () => void
+}) {
   if (log.length === 0) {
     return (
       <div className="pt-safe pb-safe px-safe flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
         <div className="text-5xl">🎉</div>
         <h1 className="text-xl font-semibold">Nothing to study right now</h1>
-        <p className="text-slate-500">No cards are due in “{deck.name}”. Come back later or add new cards.</p>
+        <p className="text-slate-500">
+          {practice
+            ? `There are no cards to practice in “${deck.name}” yet. Add some first.`
+            : `No cards are due in “${deck.name}”. Come back later or add new cards.`}
+        </p>
         <Button variant="primary" onClick={() => navigate(`/deck/${deck.id}`)}>
           Back to deck
         </Button>
+      </div>
+    )
+  }
+
+  // Practice runs don't record ratings, so there's nothing to score — just show what was covered.
+  if (practice) {
+    const seen = new Set(log.map((l) => l.key)).size
+    return (
+      <div className="pt-safe pb-safe px-safe min-h-dvh">
+        <div className="mx-auto max-w-2xl p-6">
+          <h1 className="mt-6 text-center text-2xl font-bold">Practice complete</h1>
+          <p className="hangul text-center text-slate-500">{deck.name}</p>
+          <div className="mt-6 rounded-2xl bg-white p-6 text-center ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+            <div className="text-4xl font-bold tabular-nums">{seen}</div>
+            <div className="mt-1 text-xs text-slate-500">cards practiced · your schedule is unchanged</div>
+          </div>
+          <div className="mt-8 flex flex-col gap-2 sm:flex-row-reverse">
+            <Button variant="primary" className="sm:flex-1" onClick={onAgain}>
+              Practice again
+            </Button>
+            <Button className="sm:flex-1" onClick={() => navigate(`/deck/${deck.id}`)}>
+              Done
+            </Button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -499,9 +589,14 @@ function Summary({ deck, log, cards }: { deck: Deck; log: LogEntry[]; cards: Map
           </section>
         )}
 
-        <Button variant="primary" className="mt-8 w-full" onClick={() => navigate(`/deck/${deck.id}`)}>
-          Done
-        </Button>
+        <div className="mt-8 flex flex-col gap-2 sm:flex-row-reverse">
+          <Button variant="primary" className="sm:flex-1" onClick={() => navigate(`/deck/${deck.id}`)}>
+            Done
+          </Button>
+          <Button className="sm:flex-1" onClick={onAgain}>
+            Keep practicing
+          </Button>
+        </div>
       </div>
     </div>
   )

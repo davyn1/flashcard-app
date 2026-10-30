@@ -263,7 +263,7 @@ function cardOf(key: string): string {
  * that would sit next to its sibling; a leftover clash at the end is moved to the first
  * earlier gap where it fits.
  */
-function separateSiblings(keys: string[]): string[] {
+export function separateSiblings(keys: string[]): string[] {
   const pool = [...keys]
   const out: string[] = []
   while (pool.length) {

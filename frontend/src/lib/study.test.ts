@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_SAME_SIDE, shownDirection, studyCandidates } from './study'
+import { MAX_SAME_SIDE, practiceQueue, shownDirection, studyCandidates } from './study'
 import { dirsFor, type Card, type CardDir, type Deck } from './types'
 
 const deck = (direction: Deck['direction']): Deck => ({
@@ -68,5 +68,19 @@ describe('mixed direction', () => {
     expect(shownDirection('ko_en', 'fwd', 'x', 3)).toBe('fwd')
     expect(shownDirection('en_ko', 'rev', 'x', 3)).toBe('rev')
     expect(shownDirection('both', 'rev', 'x', 3)).toBe('rev')
+  })
+})
+
+describe('practiceQueue', () => {
+  it('includes every card, ignoring due dates and the new-card limit', () => {
+    const cards = Array.from({ length: 5 }, (_, i) => card(`c${i}`))
+    const q = practiceQueue({ ...deck('ko_en'), new_per_day: 0 }, cards, new Map())
+    expect(q.length).toBe(5)
+    expect(new Set(q)).toEqual(new Set(cards.map((c) => `${c.id}:fwd`)))
+  })
+
+  it('covers both directions for a two-way deck', () => {
+    const q = practiceQueue(deck('both'), [card('a'), card('b')], new Map())
+    expect(new Set(q)).toEqual(new Set(['a:fwd', 'a:rev', 'b:fwd', 'b:rev']))
   })
 })
