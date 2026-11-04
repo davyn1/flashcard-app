@@ -299,6 +299,9 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
   and new cards and update the same schedule, so use whichever you like each time.
 - **Flashcards:** tap the card or press **Space** to flip, then tap a rating or press **1–4**.
   **Esc** ends the session.
+- **Editing while you study:** the ✎ button at the top of a study session (or **E**) edits the
+  card on screen, and **+** (or **N**) adds a new card to the deck, without leaving the session.
+  Edits show right away; new cards are saved to the deck and come up in a later session.
 - **Typing Mode:** each card shows a box: type your guess and press **Enter** (or tap
   **Don't know**). The app checks it, ignoring case, punctuation, spacing and a leading "to"/"a"/"the", and accepting
   any meaning separated by `,` `;` or `/`. A small typo counts as "almost". It then highlights

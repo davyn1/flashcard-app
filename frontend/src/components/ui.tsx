@@ -166,7 +166,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="pb-safe w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl dark:bg-slate-900"
+        className="pb-safe max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl dark:bg-slate-900"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="mb-4 text-lg font-semibold">{title}</h2>

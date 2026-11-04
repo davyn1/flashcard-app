@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, Icon, imeGuard, inputClass } from '../components/ui'
+import { CardForm } from '../components/CardForm'
+import { Button, Icon, Modal, imeGuard, inputClass } from '../components/ui'
 import { checkAnswer, suggestedRating, type AnswerResult } from '../lib/answer'
 import { db } from '../lib/db'
 import { addAcceptedAnswer, deckCards, recordReview, statesForCards } from '../lib/repo'
@@ -88,6 +89,15 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   // Bumped by "Practice again" to start a fresh session over the same deck.
   const [runId, setRunId] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  /** Edit the card on screen, or add a new card to the deck, without leaving the session. */
+  const [sheet, setSheet] = useState<'edit' | 'add' | null>(null)
+  const closeSheet = useCallback(() => setSheet(null), [])
+  // Load an edited card into the session so the change shows straight away.
+  const refreshCard = useCallback(async (id: string) => {
+    const updated = await db.cards.get(id)
+    if (!updated) return
+    setSession((cur) => (cur && cur !== 'missing' ? { ...cur, cards: new Map(cur.cards).set(id, updated) } : cur))
+  }, [])
   const voice = useKoreanVoice()
 
   // Snapshot the deck when the session starts; background syncs won't reshuffle the queue.
@@ -242,15 +252,19 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   // Keyboard: Space/Enter flips, 1–4 rate. In typing mode, Enter in the box checks the answer
   // (handled by the form) and Enter afterwards takes the suggested rating. Ignored while
   // typing elsewhere or composing Hangul.
-  const keys = useRef({ flipped, flip, rate, advance, typeMode, result, practice })
-  keys.current = { flipped, flip, rate, advance, typeMode, result, practice }
+  const keys = useRef({ flipped, flip, rate, advance, typeMode, result, practice, sheet, card })
+  keys.current = { flipped, flip, rate, advance, typeMode, result, practice, sheet, card }
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.repeat || isComposing(e) || e.metaKey || e.ctrlKey || e.altKey) return
       const t = e.target as HTMLElement | null
       if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))) return
       const k = keys.current
-      if (e.key === ' ' || e.key === 'Enter') {
+      if (k.sheet) return // the edit/add sheet handles its own keys (Escape closes it)
+      if ((e.key === 'e' || e.key === 'n') && k.card) {
+        e.preventDefault()
+        setSheet(e.key === 'e' ? 'edit' : 'add')
+      } else if (e.key === ' ' || e.key === 'Enter') {
         // preventDefault also stops this Enter from submitting the next card's answer box.
         e.preventDefault()
         if (k.flipped) {
@@ -327,6 +341,12 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
           <span className="min-w-16 text-right text-sm font-medium tabular-nums text-slate-600 dark:text-slate-300">
             {left} left
           </span>
+          <button className="tap-icon" onClick={() => setSheet('edit')} aria-label="Edit this card" title="Edit this card (E)">
+            <Icon name="edit" />
+          </button>
+          <button className="tap-icon" onClick={() => setSheet('add')} aria-label="Add a card" title="Add a card (N)">
+            <Icon name="plus" />
+          </button>
         </div>
       </div>
 
@@ -456,6 +476,21 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
           )}
         </div>
       </div>
+
+      <Modal open={sheet !== null} onClose={closeSheet} title={sheet === 'edit' ? 'Edit card' : 'Add card'}>
+        {sheet && (
+          <CardForm
+            key={sheet}
+            deckId={deckId}
+            card={sheet === 'edit' ? card : undefined}
+            onDone={(saved) => {
+              closeSheet()
+              // Show the edit straight away (and if the card is asked again this session).
+              if (sheet === 'edit' && saved) void refreshCard(saved.id)
+            }}
+          />
+        )}
+      </Modal>
     </div>
   )
 }
