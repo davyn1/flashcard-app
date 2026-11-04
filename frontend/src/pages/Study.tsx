@@ -10,8 +10,10 @@ import {
   formatDelay,
   newState,
   previewDelays,
+  releaseDue,
   review,
   type Rating,
+  type WaitingCard,
 } from '../lib/scheduler'
 import { speakKorean, useKoreanVoice } from '../lib/speech'
 import { practiceQueue, sessionQueue, shownDirection } from '../lib/study'
@@ -34,6 +36,8 @@ interface Session {
   queue: string[]
   /** No cards were due, so this is a free practice run that must not touch the schedule. */
   practice: boolean
+  /** Cards rated Again/Hard, held back until their due time. */
+  waiting: WaitingCard[]
 }
 
 interface LogEntry {
@@ -108,7 +112,7 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
       // session don't reschedule, so the spaced-repetition schedule is left untouched.
       const practice = due.length === 0
       const queue = practice ? practiceQueue(deck, cards, states) : due
-      if (!cancelled) setSession({ deck, cards: new Map(cards.map((c) => [c.id, c])), states, queue, practice })
+      if (!cancelled) setSession({ deck, cards: new Map(cards.map((c) => [c.id, c])), states, queue, practice, waiting: [] })
     })()
     return () => {
       cancelled = true
@@ -198,7 +202,7 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
       setSession({
         ...s,
         states: new Map(s.states).set(rec.id, rec),
-        queue: advanceQueue(s.queue, currentKey!, rating, next),
+        ...advanceQueue(s, currentKey!, next, now),
       })
       setLog((l) => [...l, { key: currentKey!, rating, shown }])
       setFlipped(false)
@@ -214,6 +218,26 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   useEffect(() => {
     if (s && currentKey && !card) setSession({ ...s, queue: s.queue.slice(1) })
   }, [s, currentKey, card])
+
+  // Nothing left but cards that are waiting: check every few seconds and bring them back
+  // once they're due (an interval rather than one long timeout, since phones pause timers).
+  const [clock, setClock] = useState(() => Date.now())
+  const onlyWaiting = !!s && s.queue.length === 0 && s.waiting.length > 0
+  useEffect(() => {
+    if (!onlyWaiting) return
+    const tick = () => {
+      const now = Date.now()
+      setClock(now)
+      setSession((cur) => (cur && cur !== 'missing' ? { ...cur, ...releaseDue(cur, now) } : cur))
+    }
+    tick()
+    const id = setInterval(tick, 5000)
+    document.addEventListener('visibilitychange', tick)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', tick)
+    }
+  }, [onlyWaiting])
 
   // Keyboard: Space/Enter flips, 1–4 rate. In typing mode, Enter in the box checks the answer
   // (handled by the form) and Enter afterwards takes the suggested rating. Ignored while
@@ -258,7 +282,8 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
       </div>
     )
   }
-  if (!currentKey)
+  if (!currentKey) {
+    const nextDue = session.waiting.length ? Math.min(...session.waiting.map((w) => w.due)) : null
     return (
       <Summary
         deck={session.deck}
@@ -266,15 +291,18 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
         cards={session.cards}
         practice={session.practice}
         onAgain={() => setRunId((n) => n + 1)}
+        waiting={session.waiting.length}
+        nextIn={nextDue === null ? null : Math.max(0, nextDue - clock)}
       />
     )
+  }
   if (!card) return null
 
   const rec = s!.states.get(currentKey)
   const now = Date.now()
   const delays = previewDelays(rec ? toScheduling(rec) : newState(now), now)
   const done = log.length
-  const left = s!.queue.length
+  const left = s!.queue.length + s!.waiting.length
   const suggested = typeMode && result ? suggestedRating(result) : null
 
   return (
@@ -486,12 +514,17 @@ function Summary({
   cards,
   practice,
   onAgain,
+  waiting,
+  nextIn,
 }: {
   deck: Deck
   log: LogEntry[]
   cards: Map<string, Card>
   practice: boolean
   onAgain: () => void
+  /** Cards rated Again/Hard that come back later, and ms until the first one. */
+  waiting: number
+  nextIn: number | null
 }) {
   if (log.length === 0) {
     return (
@@ -553,8 +586,18 @@ function Summary({
   return (
     <div className="pt-safe pb-safe px-safe min-h-dvh">
       <div className="mx-auto max-w-2xl p-6">
-        <h1 className="mt-6 text-center text-2xl font-bold">Session complete</h1>
+        <h1 className="mt-6 text-center text-2xl font-bold">{waiting ? 'Done for now' : 'Session complete'}</h1>
         <p className="hangul text-center text-slate-500">{deck.name}</p>
+        {waiting > 0 && nextIn !== null && (
+          <div className="mt-6 rounded-2xl bg-amber-50 p-4 text-center ring-1 ring-amber-200 dark:bg-amber-950/40 dark:ring-amber-900">
+            <p className="font-semibold text-amber-800 dark:text-amber-300">
+              {waiting} {waiting === 1 ? 'card comes' : 'cards come'} back in {formatDelay(nextIn)}
+            </p>
+            <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
+              Keep this screen open and studying picks up automatically, or come back to the deck later.
+            </p>
+          </div>
+        )}
         <div className="mt-6 grid grid-cols-3 gap-3 text-center">
           <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
             <div className="text-3xl font-bold tabular-nums">{units.size}</div>

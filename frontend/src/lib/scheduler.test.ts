@@ -9,8 +9,8 @@ import {
   maturity,
   newState,
   previewDelays,
+  releaseDue,
   review,
-  type Rating,
   type SchedulingState,
 } from './scheduler'
 
@@ -205,16 +205,18 @@ describe('buildQueue', () => {
     }
   })
 
-  it('includes cards due later today and learning cards', () => {
+  it('includes reviews due later today, but learning cards only once their time is up', () => {
+    const learning = (key: string, due: number) => ({ key, state: { ...newState(NOW), state: 'learning' as const, due } })
     const q = buildQueue(
       [
         { key: 'later-today', state: reviewCard({ due: NOW + 3 * 3600_000 }) },
-        { key: 'learning', state: { ...newState(NOW), state: 'learning', due: NOW + MIN } },
+        learning('learning-due', NOW - MIN),
+        learning('hard-in-1h', NOW + 60 * MIN),
       ],
       NOW,
       0,
     )
-    expect(new Set(q)).toEqual(new Set(['learning', 'later-today']))
+    expect(new Set(q)).toEqual(new Set(['learning-due', 'later-today']))
   })
 
   it('shuffles reviews, and picks new cards at random rather than oldest first', () => {
@@ -242,42 +244,48 @@ describe('buildQueue', () => {
   })
 })
 
-describe('advanceQueue (in-session repetition)', () => {
-  const queue = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+describe('advanceQueue (cards wait until they are due)', () => {
+  const start = { queue: ['a', 'b', 'c', 'd'], waiting: [] }
 
   it('removes a card that graduated / was answered with a day interval', () => {
     const next = review(reviewCard(), 3, NOW)
-    expect(advanceQueue(queue, 'a', 3, next)).toEqual(queue.slice(1))
+    expect(advanceQueue(start, 'a', next, NOW)).toEqual({ queue: ['b', 'c', 'd'], waiting: [] })
   })
 
-  it('re-queues a card rated Again a few cards later', () => {
-    const next = review(reviewCard(), 1, NOW)
-    const q = advanceQueue(queue, 'a', 1, next)
-    expect(q.indexOf('a')).toBe(3)
-    expect(q).toHaveLength(queue.length)
+  it('holds Hard back for the full hour instead of showing it a few cards later', () => {
+    const next = review(newState(NOW), 2, NOW)
+    let q = advanceQueue(start, 'a', next, NOW)
+    expect(q.queue).toEqual(['b', 'c', 'd'])
+    expect(q.waiting).toEqual([{ key: 'a', due: NOW + 60 * MIN }])
+    q = releaseDue(q, NOW + 59 * MIN)
+    expect(q.queue).not.toContain('a')
+    q = releaseDue(q, NOW + 60 * MIN)
+    expect(q.queue[0]).toBe('a')
+    expect(q.waiting).toEqual([])
   })
 
-  it('re-queues learning cards further back for Hard than for Again, and drops them on Good', () => {
-    const again = advanceQueue(queue, 'a', 1, review(newState(NOW), 1, NOW))
-    const hard = advanceQueue(queue, 'a', 2, review(newState(NOW), 2, NOW))
-    const good = advanceQueue(queue, 'a', 3, review(newState(NOW), 3, NOW))
-    expect(hard.indexOf('a')).toBeGreaterThan(again.indexOf('a'))
-    expect(good).not.toContain('a')
+  it('brings Again back after its minute, ahead of the remaining cards', () => {
+    let q = advanceQueue(start, 'a', review(newState(NOW), 1, NOW), NOW)
+    expect(q.queue).toEqual(['b', 'c', 'd'])
+    // Rating 'b' two minutes later releases 'a' to the front.
+    q = advanceQueue(q, 'b', review(reviewCard(), 3, NOW + 2 * MIN), NOW + 2 * MIN)
+    expect(q).toEqual({ queue: ['a', 'c', 'd'], waiting: [] })
   })
 
-  it('appends to the end when the queue is short, so the session continues until learned', () => {
-    let q = ['a']
-    let s = newState(NOW)
-    const ratings: Rating[] = [1, 2, 1, 3]
-    let shown = 0
-    for (const r of ratings) {
-      expect(q[0]).toBe('a')
-      s = review(s, r, NOW)
-      q = advanceQueue(q, 'a', r, s)
-      shown++
-    }
-    expect(shown).toBe(4)
-    expect(q).toEqual([])
+  it('does not put the card just answered straight back on screen', () => {
+    const q = advanceQueue({ queue: ['a', 'b'], waiting: [] }, 'a', review(newState(NOW), 1, NOW), NOW + 5 * MIN)
+    expect(q.queue).toEqual(['b', 'a'])
+  })
+
+  it('releases waiting cards earliest first', () => {
+    const q = releaseDue({ queue: ['x'], waiting: [{ key: 'late', due: NOW - MIN }, { key: 'early', due: NOW - 5 * MIN }] }, NOW)
+    expect(q).toEqual({ queue: ['early', 'late', 'x'], waiting: [] })
+  })
+
+  it('ends the session when only waiting cards are left', () => {
+    const q = advanceQueue({ queue: ['a'], waiting: [] }, 'a', review(newState(NOW), 2, NOW), NOW)
+    expect(q.queue).toEqual([])
+    expect(q.waiting).toHaveLength(1)
   })
 })
 
@@ -286,6 +294,11 @@ describe('countDue / maturity / struggling', () => {
     const states = [null, null, null, reviewCard({ due: NOW - DAY }), reviewCard({ due: NOW + 5 * DAY })]
     expect(countDue(states, NOW, 2)).toEqual({ due: 1, new: 2 })
     expect(countDue(states, NOW, 20)).toEqual({ due: 1, new: 3 })
+  })
+
+  it('does not count a learning card as due until its time is up', () => {
+    const learning = (due: number): SchedulingState => ({ ...newState(NOW), state: 'learning', due })
+    expect(countDue([learning(NOW + 60 * MIN), learning(NOW - MIN)], NOW, 0)).toEqual({ due: 1, new: 0 })
   })
 
   it('classifies maturity', () => {

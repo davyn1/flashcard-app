@@ -50,8 +50,6 @@ export interface SchedulerConfig {
   /** New interval after a lapse = max(graduatingInterval, old * lapseMultiplier). 0 = reset. */
   lapseMultiplier: number
   maxInterval: number
-  /** How many cards later a card is shown again within the session, per rating. */
-  requeueGap: Record<Rating, number>
 }
 
 export const DEFAULT_CONFIG: SchedulerConfig = {
@@ -66,7 +64,6 @@ export const DEFAULT_CONFIG: SchedulerConfig = {
   hardLearningDelay: 60,
   lapseMultiplier: 0,
   maxInterval: 36500,
-  requeueGap: { 1: 3, 2: 5, 3: 8, 4: 8 },
 }
 
 const MINUTE = 60_000
@@ -189,9 +186,18 @@ export function review(
   }
 }
 
-/** True if the card should be shown again later in the same study session. */
+/** True for minute/hour-based steps (learning, relearning): they come back the same day. */
 export function isInSessionStep(s: SchedulingState): boolean {
   return s.state === 'learning' || s.state === 'relearning'
+}
+
+/**
+ * Whether a studied card can be shown now. Learning/relearning cards wait for their exact due
+ * time (so Hard really stays away for an hour); day-based reviews count for the whole day.
+ */
+export function isDueNow(s: SchedulingState, now: number): boolean {
+  if (s.state === 'new') return false
+  return s.due <= (isInSessionStep(s) ? now : endOfDay(now))
 }
 
 /** Preview the delay (ms) each rating would produce — used for the button labels. */
@@ -294,8 +300,7 @@ export function buildQueue(
   newLimit: number,
   random: () => number = Math.random,
 ): string[] {
-  const cutoff = endOfDay(now)
-  const due = candidates.filter((c) => c.state && c.state.state !== 'new' && c.state.due <= cutoff)
+  const due = candidates.filter((c) => c.state && isDueNow(c.state, now))
   const fresh = shuffle(
     candidates.filter((c) => !c.state || c.state.state === 'new'),
     random,
@@ -303,23 +308,39 @@ export function buildQueue(
   return separateSiblings([...shuffle(due, random), ...fresh].map((c) => c.key))
 }
 
+/** A card rated Again/Hard this session, held back until its due time. */
+export interface WaitingCard {
+  key: string
+  due: number
+}
+
+export interface SessionQueue {
+  queue: string[]
+  waiting: WaitingCard[]
+}
+
 /**
- * After rating the card at the head of the queue, return the remaining queue.
- * Cards still in learning/relearning are re-inserted a few positions later.
+ * Move waiting cards whose time has come to the front of the queue (earliest first).
+ * `avoid` (the card just answered) isn't put straight back on screen if anything else is left.
  */
-export function advanceQueue(
-  queue: string[],
-  key: string,
-  rating: Rating,
-  next: SchedulingState,
-  config: SchedulerConfig = DEFAULT_CONFIG,
-): string[] {
-  const idx = queue.indexOf(key)
-  const rest = idx < 0 ? [...queue] : [...queue.slice(0, idx), ...queue.slice(idx + 1)]
-  if (!isInSessionStep(next)) return rest
-  const gap = config.requeueGap[rating]
-  const pos = Math.min(gap, rest.length)
-  return [...rest.slice(0, pos), key, ...rest.slice(pos)]
+export function releaseDue(q: SessionQueue, now: number, avoid?: string): SessionQueue {
+  const ready = q.waiting.filter((w) => w.due <= now).sort((a, b) => a.due - b.due)
+  if (!ready.length) return q
+  const waiting = q.waiting.filter((w) => w.due > now)
+  let queue = [...ready.map((w) => w.key), ...q.queue]
+  if (queue.length > 1 && queue[0] === avoid) queue = [queue[1], queue[0], ...queue.slice(2)]
+  return { queue, waiting }
+}
+
+/**
+ * After rating the card at the head of the queue, return the new session queue. Cards still
+ * in learning/relearning wait until their due time, then come back; the rest are done for now.
+ */
+export function advanceQueue(q: SessionQueue, key: string, next: SchedulingState, now: number): SessionQueue {
+  const queue = q.queue.filter((k) => k !== key)
+  const waiting = q.waiting.filter((w) => w.key !== key)
+  if (isInSessionStep(next)) waiting.push({ key, due: next.due })
+  return releaseDue({ queue, waiting }, now, key)
 }
 
 /** Due/new counts for a deck, matching what buildQueue would schedule today. */
@@ -328,12 +349,11 @@ export function countDue(
   now: number,
   newLimit: number,
 ): { due: number; new: number } {
-  const cutoff = endOfDay(now)
   let due = 0
   let fresh = 0
   for (const s of states) {
     if (!s || s.state === 'new') fresh++
-    else if (s.due <= cutoff) due++
+    else if (isDueNow(s, now)) due++
   }
   return { due, new: Math.min(fresh, Math.max(0, newLimit)) }
 }

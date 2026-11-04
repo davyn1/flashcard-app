@@ -21,18 +21,22 @@ render.yaml          Render blueprint for the backend
 - **Spaced repetition** ([`frontend/src/lib/scheduler.ts`](frontend/src/lib/scheduler.ts)) is a
   simplified SM-2, written as pure functions with unit tests. After each card you rate it
   **Again / Hard / Good / Easy**:
-  - New cards: *Again* brings the card back in 1 minute and *Hard* in 1 hour (both also repeat
-    it later in the same session). *Good* graduates it to 2 days and *Easy* to 4 days.
+  - New cards: *Again* brings the card back in 1 minute and *Hard* in 1 hour. *Good* graduates
+    it to 2 days and *Easy* to 4 days.
   - Review cards grow their interval: *Hard* ×1.2, *Good* ×ease, *Easy* ×ease×1.3. The ease
     factor starts at 2.5, drops by 0.15 on *Hard*, rises by 0.15 on *Easy*, and never goes below 1.3.
   - *Again* on a learned card counts a lapse, lowers ease by 0.2, and sends the card to
-    relearning. It comes back 3 cards later in the session and stays until you get it right;
+    relearning. It comes back in 10 minutes and keeps coming back until you get it right;
     *Good* then sends it back out for 2 days.
     (Again during *initial* learning just restarts the steps and doesn't count as a lapse,
     so brand-new words don't get flagged as "struggling" on their first day.)
   - Each session shows the cards due for review first, then up to the deck's daily limit of
     new cards (default 20), picked at random from all your new cards. Both groups are shuffled
     every session, and the two directions of the same word are never shown back to back.
+  - Cards you rate *Again* or *Hard* really wait for the time on the button: they stay out of
+    the session (and out of new sessions) until then, and come back first once it's up. If
+    only waiting cards are left, the session ends with a "comes back in …" countdown; keep
+    that screen open and studying picks up on its own, or start a new session later.
 - **Offline-first.** All data lives in IndexedDB. Every change is written locally first and
   queued in an outbox. The sync engine pushes the outbox and pulls server changes when the
   app opens, every minute while it's visible, when the connection comes back, and shortly
