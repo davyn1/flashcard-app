@@ -20,6 +20,8 @@ def test_alembic_upgrade_creates_all_tables(tmp_path):
     assert "answer_mode" in deck_columns
     card_columns = {c["name"] for c in inspect(create_engine(url)).get_columns("cards")}
     assert {"accepted_front", "accepted_back"} <= card_columns
+    state_columns = {c["name"] for c in inspect(create_engine(url)).get_columns("card_states")}
+    assert "track" in state_columns
 
     command.downgrade(cfg, "base")
     assert "decks" not in set(inspect(create_engine(url)).get_table_names())

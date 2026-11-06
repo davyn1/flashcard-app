@@ -1,4 +1,4 @@
-import { buildQueue, countDue, separateSiblings, shuffle, startOfDay, type QueueCandidate } from './scheduler'
+import { buildQueue, countDue, startOfDay, type QueueCandidate } from './scheduler'
 import {
   dirsFor,
   stateId,
@@ -8,14 +8,23 @@ import {
   type CardStateRecord,
   type Deck,
   type StudyDirection,
+  type Track,
 } from './types'
 
-/** One studyable unit per card per active direction. */
-export function studyCandidates(deck: Deck, cards: Card[], states: Map<string, CardStateRecord>): QueueCandidate[] {
+/**
+ * One studyable unit per card per active direction, with its state on the given track. Keys
+ * are always the main `card:dir` form; the track only decides which schedule is read.
+ */
+export function studyCandidates(
+  deck: Deck,
+  cards: Card[],
+  states: Map<string, CardStateRecord>,
+  track: Track = 'main',
+): QueueCandidate[] {
   const dirs = dirsFor(deck.direction)
   return cards.flatMap((c) =>
     dirs.map((dir) => {
-      const rec = states.get(stateId(c.id, dir))
+      const rec = states.get(stateId(c.id, dir, track))
       return { key: stateId(c.id, dir), state: rec ? toScheduling(rec) : null }
     }),
   )
@@ -32,6 +41,7 @@ export function newLimitRemaining(
   const ids = new Set(cards.map((c) => c.id))
   let introducedToday = 0
   for (const s of states.values()) {
+    if (s.track === 'practice') continue // practice doesn't use up the daily new-card limit
     if (ids.has(s.card_id) && s.introduced_at !== null && s.introduced_at >= since) introducedToday++
   }
   return Math.max(0, deck.new_per_day - introducedToday)
@@ -98,9 +108,10 @@ export function sessionQueue(
 }
 
 /**
- * A practice run over every card in the deck (all active directions), shuffled. Used when
- * nothing is due so the user can keep studying; the caller must not reschedule from it.
+ * A practice run, used when nothing is due. Practice has its own schedule (same timings, kept
+ * apart from your real one): cards due for practice first, then every card not yet practiced,
+ * with no daily limit.
  */
-export function practiceQueue(deck: Deck, cards: Card[], states: Map<string, CardStateRecord>): string[] {
-  return separateSiblings(shuffle(studyCandidates(deck, cards, states).map((c) => c.key)))
+export function practiceQueue(deck: Deck, cards: Card[], states: Map<string, CardStateRecord>, now: number): string[] {
+  return buildQueue(studyCandidates(deck, cards, states, 'practice'), now, Infinity)
 }

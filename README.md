@@ -297,6 +297,11 @@ go to Settings → Accessibility → Spoken Content → Voices → Korean and do
   you want a reading aid while you learn the script.
 - **Study modes:** on a deck, pick **Flashcards** or **Typing Mode**. Both study the same due
   and new cards and update the same schedule, so use whichever you like each time.
+- **Practice mode:** once nothing is due, the same buttons start a practice run (marked
+  *Practice*). It works exactly like a normal session (same ratings, timings and waiting cards)
+  but on a **separate practice schedule**, synced like the real one: a word you rate *Good* in
+  practice stays out of practice for 2 days, while your real reviews and stats are untouched.
+  Each run shows the cards due for practice, then every card you haven't practiced yet.
 - **Flashcards:** tap the card or press **Space** to flip, then tap a rating or press **1–4**.
   **Esc** ends the session.
 - **Editing while you study:** the ✎ button at the top of a study session (or **E**) edits the

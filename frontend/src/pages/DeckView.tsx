@@ -55,7 +55,7 @@ export default function DeckView({ deckId }: { deckId: string }) {
         {summary.due + summary.new === 0 && (
           <p className="mt-4 text-center font-medium text-slate-500">
             All done for today 🎉
-            <span className="mt-1 block text-xs font-normal">Practice anyway — it won’t change your schedule.</span>
+            <span className="mt-1 block text-xs font-normal">Practice anyway — it has its own schedule and won’t change your real one.</span>
           </p>
         )}
         <div className="mt-4 grid grid-cols-2 gap-2">

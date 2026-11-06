@@ -22,6 +22,7 @@ AcceptedAnswers = Annotated[
 ]
 Direction = Literal["fwd", "rev"]
 StateKind = Literal["new", "learning", "review", "relearning"]
+Track = Literal["main", "practice"]
 
 
 class _Record(BaseModel):
@@ -60,6 +61,7 @@ class CardStateRecord(_Record):
     id: Annotated[str, StringConstraints(max_length=48)]
     card_id: Uuid
     direction: Direction
+    track: Track = "main"
     state: StateKind
     ease: float = Field(ge=1.0, le=10.0)
     interval: float = Field(ge=0, le=100_000)
@@ -74,8 +76,9 @@ class CardStateRecord(_Record):
 
     @model_validator(mode="after")
     def _id_matches(self) -> "CardStateRecord":
-        if self.id != f"{self.card_id}:{self.direction}":
-            raise ValueError("id must be '<card_id>:<direction>'")
+        suffix = ":p" if self.track == "practice" else ""
+        if self.id != f"{self.card_id}:{self.direction}{suffix}":
+            raise ValueError("id must be '<card_id>:<direction>' (plus ':p' for practice)")
         return self
 
 

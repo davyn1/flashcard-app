@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_SAME_SIDE, practiceQueue, shownDirection, studyCandidates } from './study'
-import { dirsFor, type Card, type CardDir, type Deck } from './types'
+import { MAX_SAME_SIDE, newLimitRemaining, practiceQueue, shownDirection, studyCandidates } from './study'
+import { newState, review } from './scheduler'
+import { dirsFor, fromScheduling, type Card, type CardDir, type Deck } from './types'
 
 const deck = (direction: Deck['direction']): Deck => ({
   id: 'd',
@@ -72,15 +73,41 @@ describe('mixed direction', () => {
 })
 
 describe('practiceQueue', () => {
-  it('includes every card, ignoring due dates and the new-card limit', () => {
+  const NOW = new Date(2026, 10, 5, 12).getTime()
+  const DAY = 86_400_000
+
+  it('includes every card never practiced, ignoring the new-card limit', () => {
     const cards = Array.from({ length: 5 }, (_, i) => card(`c${i}`))
-    const q = practiceQueue({ ...deck('ko_en'), new_per_day: 0 }, cards, new Map())
+    const q = practiceQueue({ ...deck('ko_en'), new_per_day: 0 }, cards, new Map(), NOW)
     expect(q.length).toBe(5)
     expect(new Set(q)).toEqual(new Set(cards.map((c) => `${c.id}:fwd`)))
   })
 
   it('covers both directions for a two-way deck', () => {
-    const q = practiceQueue(deck('both'), [card('a'), card('b')], new Map())
+    const q = practiceQueue(deck('both'), [card('a'), card('b')], new Map(), NOW)
     expect(new Set(q)).toEqual(new Set(['a:fwd', 'a:rev', 'b:fwd', 'b:rev']))
+  })
+
+  it('follows the practice schedule and ignores the real one', () => {
+    const [a, b, c] = [card('a'), card('b'), card('c')]
+    const reviewed = (due: number) => ({ ...newState(NOW), state: 'review' as const, interval: 2, due })
+    const states = new Map([
+      // a: practiced Good, not due for practice for 2 days (though due for real today)
+      ['a:fwd:p', fromScheduling('a', 'fwd', reviewed(NOW + 2 * DAY), NOW, 'practice')],
+      ['a:fwd', fromScheduling('a', 'fwd', reviewed(NOW - DAY), NOW)],
+      // b: due for practice; its real schedule is far out
+      ['b:fwd:p', fromScheduling('b', 'fwd', reviewed(NOW - DAY), NOW, 'practice')],
+      ['b:fwd', fromScheduling('b', 'fwd', reviewed(NOW + 30 * DAY), NOW)],
+      // c: never practiced
+    ])
+    expect(practiceQueue(deck('ko_en'), [a, b, c], states, NOW)).toEqual(['b:fwd', 'c:fwd'])
+  })
+
+  it("doesn't use up the daily new-card limit", () => {
+    const cards = [card('a'), card('b')]
+    const practiced = new Map(
+      cards.map((c) => [`${c.id}:fwd:p`, fromScheduling(c.id, 'fwd', review(newState(NOW), 3, NOW), NOW, 'practice')]),
+    )
+    expect(newLimitRemaining({ ...deck('ko_en'), new_per_day: 5 }, cards, practiced, NOW)).toBe(5)
   })
 })

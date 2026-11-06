@@ -45,6 +45,7 @@ def state(updated_at=1000, **kw):
         "id": f"{CARD_ID}:fwd",
         "card_id": CARD_ID,
         "direction": "fwd",
+        "track": "main",
         "state": "review",
         "ease": 2.5,
         "interval": 3,
@@ -210,6 +211,21 @@ def test_card_state_last_write_wins(client, auth):
     assert pull(client, auth)["card_states"][0]["interval"] == 8
 
 
+def test_practice_state_is_separate_from_the_real_schedule(client, auth):
+    practice = state(id=f"{CARD_ID}:fwd:p", track="practice", interval=9)
+    push(client, auth, card_states=[state(interval=3), practice])
+    by_id = {s["id"]: s for s in pull(client, auth)["card_states"]}
+    assert by_id[f"{CARD_ID}:fwd"]["interval"] == 3
+    assert by_id[f"{CARD_ID}:fwd:p"] == practice
+
+
+def test_card_state_track_defaults_to_main(client, auth):
+    old_client = state()
+    del old_client["track"]
+    push(client, auth, card_states=[old_client])
+    assert pull(client, auth)["card_states"][0]["track"] == "main"
+
+
 def test_reviews_are_append_only_and_deduplicated(client, auth):
     r1, r2 = review(), review(rating=1)
     push(client, auth, reviews=[r1])
@@ -246,6 +262,8 @@ def test_server_normalizes_text_to_nfc(client, auth):
         {"decks": [deck(answer_mode="quiz")]},
         {"card_states": [state(id=f"{uuid.uuid4()}:fwd")]},  # id doesn't match card_id
         {"card_states": [state(ease=0.5)]},
+        {"card_states": [state(id=f"{CARD_ID}:fwd:p")]},  # practice suffix on a main state
+        {"card_states": [state(track="practice")]},  # practice state without the suffix
         {"reviews": [review(rating=5)]},
         {"unknown_table": []},
         {"cards": [card(updated_at=1000 + i, id=str(uuid.uuid4())) for i in range(5001)]},

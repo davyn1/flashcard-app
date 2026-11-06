@@ -13,6 +13,7 @@ import {
   type CardDir,
   type CardSide,
   type CardStateRecord,
+  type Track,
   type Deck,
   type ReviewRecord,
   type SyncTable,
@@ -217,20 +218,29 @@ export async function statesForCards(cardIds: string[]): Promise<Map<string, Car
 // Reviews
 // ---------------------------------------------------------------------------
 
-/** Apply a rating: update the card's scheduling state and append to the review log. */
+/**
+ * Apply a rating: update the card's scheduling state and append to the review log. Practice
+ * ratings update the separate practice schedule only and stay out of the log (and the stats).
+ */
 export async function recordReview(
   card: Card,
   dir: CardDir,
   rating: Rating,
   now = Date.now(),
+  track: Track = 'main',
 ): Promise<CardStateRecord> {
   let result!: CardStateRecord
   await db.transaction('rw', db.card_states, db.reviews, db.outbox, async () => {
-    const id = stateId(card.id, dir)
+    const id = stateId(card.id, dir, track)
     const existing = await db.card_states.get(id)
     const prev = existing && !existing.deleted_at ? toScheduling(existing) : newState(now)
     const next = review(prev, rating, now)
-    result = fromScheduling(card.id, dir, next, nextTimestamp(existing, now))
+    result = fromScheduling(card.id, dir, next, nextTimestamp(existing, now), track)
+    if (track === 'practice') {
+      await db.card_states.put(result)
+      await markDirty('card_states', id)
+      return
+    }
     const log: ReviewRecord = {
       id: uuid(),
       card_id: card.id,

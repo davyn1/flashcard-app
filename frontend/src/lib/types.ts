@@ -51,11 +51,19 @@ export interface Card {
   deleted_at: number | null
 }
 
-/** Scheduling state for one direction of a card. id = `${card_id}:${direction}`. */
+/** Which schedule a state belongs to: your real reviews, or practice mode's separate one. */
+export type Track = 'main' | 'practice'
+
+/**
+ * Scheduling state for one direction of a card. id = `${card_id}:${direction}` on the main
+ * track, plus `:p` on the practice track.
+ */
 export interface CardStateRecord {
   id: string
   card_id: string
   direction: CardDir
+  /** Missing on records written before practice mode had its own schedule (= main). */
+  track?: Track
   state: CardStateKind
   ease: number
   interval: number
@@ -90,8 +98,8 @@ export function dirsFor(direction: StudyDirection): CardDir[] {
   return direction === 'both' ? ['fwd', 'rev'] : direction === 'en_ko' ? ['rev'] : ['fwd']
 }
 
-export function stateId(cardId: string, dir: CardDir): string {
-  return `${cardId}:${dir}`
+export function stateId(cardId: string, dir: CardDir, track: Track = 'main'): string {
+  return track === 'practice' ? `${cardId}:${dir}:p` : `${cardId}:${dir}`
 }
 
 export function toScheduling(r: CardStateRecord): SchedulingState {
@@ -113,11 +121,13 @@ export function fromScheduling(
   dir: CardDir,
   s: SchedulingState,
   updatedAt: number,
+  track: Track = 'main',
 ): CardStateRecord {
   return {
-    id: stateId(cardId, dir),
+    id: stateId(cardId, dir, track),
     card_id: cardId,
     direction: dir,
+    track,
     state: s.state,
     ease: s.ease,
     interval: s.interval,

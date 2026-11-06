@@ -61,7 +61,7 @@ export default function Stats({ deckId }: { deckId: string }) {
   // Struggling: many lapses or low ease (either direction).
   const cardById = new Map(cards.map((c) => [c.id, c]))
   const struggling = [...states.values()]
-    .filter((s) => cardById.has(s.card_id) && isStruggling(toScheduling(s)))
+    .filter((s) => s.track !== 'practice' && cardById.has(s.card_id) && isStruggling(toScheduling(s)))
     .sort((a, b) => b.lapses - a.lapses || a.ease - b.ease)
 
   return (

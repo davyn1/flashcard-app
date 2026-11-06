@@ -103,6 +103,18 @@ describe('local writes', () => {
     ])
     expect(await db.outbox.where('table').equals('reviews').count()).toBe(2)
   })
+
+  it('practice ratings update the practice schedule only, without logging a review', async () => {
+    const deck = await createDeck('D')
+    const card = await addCard(deck.id, { front: '학교', back: 'school' })
+    const s = await recordReview(card, 'fwd', 3, 1_000_000, 'practice')
+    expect(s.id).toBe(`${card.id}:fwd:p`)
+    expect(s.track).toBe('practice')
+    expect(s.state).toBe('review')
+    expect(await db.card_states.get(`${card.id}:fwd`)).toBeUndefined()
+    expect(await db.reviews.where('card_id').equals(card.id).count()).toBe(0)
+    expect(await db.outbox.get(`card_states:${s.id}`)).toBeDefined()
+  })
 })
 
 describe('mergeRecords (last-write-wins)', () => {

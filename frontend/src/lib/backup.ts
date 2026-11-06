@@ -56,6 +56,7 @@ function validCard(r: unknown) {
 function validState(r: unknown) {
   return (
     isObj(r) && isStr(r.id) && isStr(r.card_id) && ['fwd', 'rev'].includes(r.direction as string) &&
+    [undefined, 'main', 'practice'].includes(r.track as string | undefined) &&
     ['new', 'learning', 'review', 'relearning'].includes(r.state as string) &&
     [r.ease, r.interval, r.reps, r.lapses, r.step, r.due, r.updated_at].every(isNum) &&
     isNumOrNull(r.last_reviewed) && isNumOrNull(r.introduced_at) && isNumOrNull(r.deleted_at)

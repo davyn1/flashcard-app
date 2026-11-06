@@ -22,6 +22,7 @@ import { hasHangul, isComposing } from '../lib/text'
 import {
   answerSide,
   fromScheduling,
+  stateId,
   toScheduling,
   type AnswerMode,
   type Card,
@@ -35,7 +36,7 @@ interface Session {
   cards: Map<string, Card>
   states: Map<string, CardStateRecord>
   queue: string[]
-  /** No cards were due, so this is a free practice run that must not touch the schedule. */
+  /** No cards were due, so this is a practice run: it uses practice mode's own schedule. */
   practice: boolean
   /** Cards rated Again/Hard, held back until their due time. */
   waiting: WaitingCard[]
@@ -117,11 +118,12 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
       }
       const cards = await deckCards(deckId)
       const states = await statesForCards(cards.map((c) => c.id))
-      const due = sessionQueue(deck, cards, states, Date.now())
-      // Nothing due: fall back to a practice run over the whole deck. Ratings in a practice
-      // session don't reschedule, so the spaced-repetition schedule is left untouched.
+      const now = Date.now()
+      const due = sessionQueue(deck, cards, states, now)
+      // Nothing due: fall back to a practice run. Practice ratings work the same way but go
+      // to a separate practice schedule, so your real one is left untouched.
       const practice = due.length === 0
-      const queue = practice ? practiceQueue(deck, cards, states) : due
+      const queue = practice ? practiceQueue(deck, cards, states, now) : due
       if (!cancelled) setSession({ deck, cards: new Map(cards.map((c) => [c.id, c])), states, queue, practice, waiting: [] })
     })()
     return () => {
@@ -191,24 +193,14 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
 
   // The UI advances immediately (computed with the same pure scheduler); the write to
   // IndexedDB happens in the background so fast keyboard input never gets dropped.
-  // Practice mode: move to the next card without recording a review or rescheduling.
-  const advance = useCallback(() => {
-    if (!s || !card || !current || !flipped) return
-    setLog((l) => [...l, { key: currentKey!, rating: 3, shown }])
-    setSession({ ...s, queue: s.queue.slice(1) })
-    setFlipped(false)
-    setTyped('')
-    setResult(null)
-    setSavedAnswer(false)
-  }, [s, card, current, currentKey, flipped, shown])
-
   const rate = useCallback(
     (rating: Rating) => {
-      if (!s || !card || !current || !flipped || s.practice) return
+      if (!s || !card || !current || !flipped) return
       const now = Date.now()
-      const prevRec = s.states.get(currentKey!)
+      const track = s.practice ? 'practice' : 'main'
+      const prevRec = s.states.get(stateId(card.id, current.dir, track))
       const next = review(prevRec ? toScheduling(prevRec) : newState(now), rating, now)
-      const rec = fromScheduling(card.id, current.dir, next, now)
+      const rec = fromScheduling(card.id, current.dir, next, now, track)
       setSession({
         ...s,
         states: new Map(s.states).set(rec.id, rec),
@@ -219,7 +211,7 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
       setTyped('')
       setResult(null)
       setSavedAnswer(false)
-      recordReview(card, current.dir, rating, now).catch((e) => console.error('Failed to save review', e))
+      recordReview(card, current.dir, rating, now, track).catch((e) => console.error('Failed to save review', e))
     },
     [s, card, current, currentKey, flipped],
   )
@@ -252,8 +244,8 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   // Keyboard: Space/Enter flips, 1–4 rate. In typing mode, Enter in the box checks the answer
   // (handled by the form) and Enter afterwards takes the suggested rating. Ignored while
   // typing elsewhere or composing Hangul.
-  const keys = useRef({ flipped, flip, rate, advance, typeMode, result, practice, sheet, card })
-  keys.current = { flipped, flip, rate, advance, typeMode, result, practice, sheet, card }
+  const keys = useRef({ flipped, flip, rate, typeMode, result, sheet, card })
+  keys.current = { flipped, flip, rate, typeMode, result, sheet, card }
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.repeat || isComposing(e) || e.metaKey || e.ctrlKey || e.altKey) return
@@ -268,15 +260,14 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
         // preventDefault also stops this Enter from submitting the next card's answer box.
         e.preventDefault()
         if (k.flipped) {
-          // Practice: advance to the next card. Normal typing: Enter takes the suggested rating.
-          if (k.practice) k.advance()
-          else if (k.typeMode && e.key === 'Enter' && k.result) k.rate(suggestedRating(k.result))
+          // Typing mode: Enter takes the suggested rating.
+          if (k.typeMode && e.key === 'Enter' && k.result) k.rate(suggestedRating(k.result))
         } else if (k.typeMode) {
           inputRef.current?.focus()
         } else {
           k.flip()
         }
-      } else if (['1', '2', '3', '4'].includes(e.key) && k.flipped && !k.practice) {
+      } else if (['1', '2', '3', '4'].includes(e.key) && k.flipped) {
         e.preventDefault()
         k.rate(Number(e.key) as Rating)
       } else if (e.key === 'Escape') {
@@ -312,7 +303,7 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
   }
   if (!card) return null
 
-  const rec = s!.states.get(currentKey)
+  const rec = s!.states.get(stateId(current!.cardId, current!.dir, practice ? 'practice' : 'main'))
   const now = Date.now()
   const delays = previewDelays(rec ? toScheduling(rec) : newState(now), now)
   const done = log.length
@@ -440,10 +431,6 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
             <Button variant="primary" className="h-14 w-full text-lg" onClick={flip}>
               Show answer <kbd className="hidden text-xs opacity-70 sm:inline">Space</kbd>
             </Button>
-          ) : practice ? (
-            <Button variant="primary" className="h-14 w-full text-lg" onClick={advance}>
-              Next <kbd className="hidden text-xs opacity-70 sm:inline">Space</kbd>
-            </Button>
           ) : (
             <div className="grid grid-cols-4 gap-2">
               {([1, 2, 3, 4] as Rating[]).map((r) => (
@@ -468,7 +455,7 @@ export default function Study({ deckId, mode }: { deckId: string; mode: AnswerMo
               ))}
             </div>
           )}
-          {flipped && !practice && suggested && (
+          {flipped && suggested && (
             <p id="suggested-hint" className="mt-2 text-center text-xs text-slate-500">
               Suggested: {RATING_LABELS[suggested]}
               <span className="hidden sm:inline"> · press Enter</span> — or pick another
@@ -565,40 +552,15 @@ function Summary({
     return (
       <div className="pt-safe pb-safe px-safe flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
         <div className="text-5xl">🎉</div>
-        <h1 className="text-xl font-semibold">Nothing to study right now</h1>
+        <h1 className="text-xl font-semibold">{practice ? 'Nothing to practice right now' : 'Nothing to study right now'}</h1>
         <p className="text-slate-500">
           {practice
-            ? `There are no cards to practice in “${deck.name}” yet. Add some first.`
+            ? `Every card in “${deck.name}” is waiting on its practice schedule. Come back later or add new cards.`
             : `No cards are due in “${deck.name}”. Come back later or add new cards.`}
         </p>
         <Button variant="primary" onClick={() => navigate(`/deck/${deck.id}`)}>
           Back to deck
         </Button>
-      </div>
-    )
-  }
-
-  // Practice runs don't record ratings, so there's nothing to score — just show what was covered.
-  if (practice) {
-    const seen = new Set(log.map((l) => l.key)).size
-    return (
-      <div className="pt-safe pb-safe px-safe min-h-dvh">
-        <div className="mx-auto max-w-2xl p-6">
-          <h1 className="mt-6 text-center text-2xl font-bold">Practice complete</h1>
-          <p className="hangul text-center text-slate-500">{deck.name}</p>
-          <div className="mt-6 rounded-2xl bg-white p-6 text-center ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-            <div className="text-4xl font-bold tabular-nums">{seen}</div>
-            <div className="mt-1 text-xs text-slate-500">cards practiced · your schedule is unchanged</div>
-          </div>
-          <div className="mt-8 flex flex-col gap-2 sm:flex-row-reverse">
-            <Button variant="primary" className="sm:flex-1" onClick={onAgain}>
-              Practice again
-            </Button>
-            <Button className="sm:flex-1" onClick={() => navigate(`/deck/${deck.id}`)}>
-              Done
-            </Button>
-          </div>
-        </div>
       </div>
     )
   }
@@ -621,8 +583,13 @@ function Summary({
   return (
     <div className="pt-safe pb-safe px-safe min-h-dvh">
       <div className="mx-auto max-w-2xl p-6">
-        <h1 className="mt-6 text-center text-2xl font-bold">{waiting ? 'Done for now' : 'Session complete'}</h1>
+        <h1 className="mt-6 text-center text-2xl font-bold">
+          {waiting ? 'Done for now' : practice ? 'Practice complete' : 'Session complete'}
+        </h1>
         <p className="hangul text-center text-slate-500">{deck.name}</p>
+        {practice && (
+          <p className="mt-1 text-center text-xs text-slate-500">Practice has its own schedule; your real reviews are unchanged.</p>
+        )}
         {waiting > 0 && nextIn !== null && (
           <div className="mt-6 rounded-2xl bg-amber-50 p-4 text-center ring-1 ring-amber-200 dark:bg-amber-950/40 dark:ring-amber-900">
             <p className="font-semibold text-amber-800 dark:text-amber-300">

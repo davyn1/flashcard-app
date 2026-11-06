@@ -50,13 +50,19 @@ class Card(Base):
 
 
 class CardState(Base):
-    """Scheduling state for one direction of one card. id = "<card_id>:<fwd|rev>"."""
+    """Scheduling state for one direction of one card.
+
+    id = "<card_id>:<fwd|rev>" for the real schedule (track "main"), or
+    "<card_id>:<fwd|rev>:p" for practice mode's separate schedule (track "practice").
+    """
 
     __tablename__ = "card_states"
 
     id: Mapped[str] = mapped_column(String(48), primary_key=True)
     card_id: Mapped[str] = mapped_column(String(36), index=True)
     direction: Mapped[str] = mapped_column(String(3))
+    # "main" | "practice"
+    track: Mapped[str] = mapped_column(String(8), default="main", server_default="main")
     # "new" | "learning" | "review" | "relearning"
     state: Mapped[str] = mapped_column(String(12))
     ease: Mapped[float] = mapped_column(Float)
