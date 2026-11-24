@@ -289,10 +289,14 @@ export function separateSiblings(keys: string[]): string[] {
   return out
 }
 
+/** Reviews with an interval longer than this (days) wait until after the session's new cards. */
+export const LONG_REVIEW_DAYS = 7
+
 /**
- * Build the session queue: cards due for review first, then up to `newLimit` new cards
- * picked at random from all the new ones. Both groups are shuffled so words don't come up
- * in the same order every time.
+ * Build the session queue, each group shuffled so words don't come up in the same order every
+ * time: due learning cards and short reviews (interval up to LONG_REVIEW_DAYS) first, then up
+ * to `newLimit` new cards picked at random from all the new ones, then the long reviews, which
+ * are well learned and can wait a little.
  */
 export function buildQueue(
   candidates: QueueCandidate[],
@@ -301,11 +305,16 @@ export function buildQueue(
   random: () => number = Math.random,
 ): string[] {
   const due = candidates.filter((c) => c.state && isDueNow(c.state, now))
+  const isLong = (c: QueueCandidate) => c.state!.state === 'review' && c.state!.interval > LONG_REVIEW_DAYS
   const fresh = shuffle(
     candidates.filter((c) => !c.state || c.state.state === 'new'),
     random,
   ).slice(0, Math.max(0, newLimit))
-  return separateSiblings([...shuffle(due, random), ...fresh].map((c) => c.key))
+  return separateSiblings(
+    [...shuffle(due.filter((c) => !isLong(c)), random), ...fresh, ...shuffle(due.filter(isLong), random)].map(
+      (c) => c.key,
+    ),
+  )
 }
 
 /** A card rated Again/Hard this session, held back until its due time. */

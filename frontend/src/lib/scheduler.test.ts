@@ -183,7 +183,10 @@ describe('buildQueue', () => {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
     return ((t ^ (t >>> 14)) >>> 0) / 2 ** 32
   }
-  const due = (key: string, daysAgo = 1) => ({ key, state: reviewCard({ due: NOW - daysAgo * DAY }) })
+  const due = (key: string, daysAgo = 1, interval = 3) => ({
+    key,
+    state: reviewCard({ due: NOW - daysAgo * DAY, interval }),
+  })
   const fresh = (key: string) => ({ key, state: null })
 
   it('puts due cards first, then new cards up to the limit', () => {
@@ -202,6 +205,24 @@ describe('buildQueue', () => {
       expect(new Set(q.slice(0, 3))).toEqual(new Set(['due-1', 'due-2', 'due-3']))
       expect(q.slice(3).every((k) => k.startsWith('new-'))).toBe(true)
       expect(q).not.toContain('not-due')
+    }
+  })
+
+  it('shows new cards before reviews with an interval over 7 days', () => {
+    const learning = { key: 'learning', state: { ...newState(NOW), state: 'learning' as const, due: NOW - MIN } }
+    const candidates = [
+      due('long-1', 1, 8),
+      fresh('new-a'),
+      due('short-7d', 1, 7),
+      due('long-2', 1, 30),
+      learning,
+      fresh('new-b'),
+    ]
+    for (let seed = 1; seed <= 20; seed++) {
+      const q = buildQueue(candidates, NOW, 20, seeded(seed))
+      expect(new Set(q.slice(0, 2))).toEqual(new Set(['learning', 'short-7d']))
+      expect(new Set(q.slice(2, 4))).toEqual(new Set(['new-a', 'new-b']))
+      expect(new Set(q.slice(4))).toEqual(new Set(['long-1', 'long-2']))
     }
   })
 
