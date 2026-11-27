@@ -30,10 +30,10 @@ render.yaml          Render blueprint for the backend
     *Good* then sends it back out for 2 days.
     (Again during *initial* learning just restarts the steps and doesn't count as a lapse,
     so brand-new words don't get flagged as "struggling" on their first day.)
-  - Each session shows, in this order: learning cards and reviews with an interval of up to
-    7 days; then up to the deck's daily limit of new cards (default 20), picked at random from
-    all your new cards; then reviews with an interval over 7 days, which you know well enough to
-    wait. Each group is shuffled every session, and the two directions of the same word are
+  - Each session shows, in this order: learning cards and reviews with an interval under
+    2 days; then up to the deck's daily limit of new cards (default 20), picked at random from
+    all your new cards; then reviews with an interval of 2 days or more, which you know well
+    enough to wait. Each group is shuffled every session, and the two directions of the same word are
     never shown back to back.
   - Cards you rate *Again* or *Hard* really wait for the time on the button: they stay out of
     the session (and out of new sessions) until then, and come back first once it's up. If
