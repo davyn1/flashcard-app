@@ -90,7 +90,7 @@ describe('practiceQueue', () => {
 
   it('follows the practice schedule and ignores the real one', () => {
     const [a, b, c] = [card('a'), card('b'), card('c')]
-    const reviewed = (due: number) => ({ ...newState(NOW), state: 'review' as const, interval: 2, due })
+    const reviewed = (due: number) => ({ ...newState(NOW), state: 'review' as const, interval: 1, due })
     const states = new Map([
       // a: practiced Good, not due for practice for 2 days (though due for real today)
       ['a:fwd:p', fromScheduling('a', 'fwd', reviewed(NOW + 2 * DAY), NOW, 'practice')],

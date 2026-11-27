@@ -289,12 +289,12 @@ export function separateSiblings(keys: string[]): string[] {
   return out
 }
 
-/** Reviews with an interval longer than this (days) wait until after the session's new cards. */
-export const LONG_REVIEW_DAYS = 7
+/** Reviews with an interval of this many days or more wait until after the session's new cards. */
+export const LONG_REVIEW_DAYS = 2
 
 /**
  * Build the session queue, each group shuffled so words don't come up in the same order every
- * time: due learning cards and short reviews (interval up to LONG_REVIEW_DAYS) first, then up
+ * time: due learning cards and short reviews (interval under LONG_REVIEW_DAYS) first, then up
  * to `newLimit` new cards picked at random from all the new ones, then the long reviews, which
  * are well learned and can wait a little.
  */
@@ -305,7 +305,7 @@ export function buildQueue(
   random: () => number = Math.random,
 ): string[] {
   const due = candidates.filter((c) => c.state && isDueNow(c.state, now))
-  const isLong = (c: QueueCandidate) => c.state!.state === 'review' && c.state!.interval > LONG_REVIEW_DAYS
+  const isLong = (c: QueueCandidate) => c.state!.state === 'review' && c.state!.interval >= LONG_REVIEW_DAYS
   const fresh = shuffle(
     candidates.filter((c) => !c.state || c.state.state === 'new'),
     random,
